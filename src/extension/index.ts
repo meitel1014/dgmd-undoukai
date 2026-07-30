@@ -282,8 +282,10 @@ export default (nodecg: NodeCG) => {
   // GET /cast-icons/{キャスト名}
   nodecg.mount('/cast-icons', createCastIconMiddleware(log));
 
-  // GET /stage-icons/{ステージ名}  … 高解像度アイコン（data/stage_icon、Graphic 用）
-  nodecg.mount('/stage-icons', createStageIconMiddleware(log));
+  // GET /stage-icons/{ステージ名}  … Graphic 用（data/stage_icon の 1920×1080 を
+  // sharp で実表示幅（セル 208px 相当）へ高品質縮小して配信し、ブラウザ側の再スケール＝
+  // ジャギーを避ける。Graphic 側は CSS transform で拡縮しない前提。）
+  nodecg.mount('/stage-icons', createStageIconMiddleware(log, undefined, { resizeWidth: 208 }));
 
   // GET /stage-thumbs/{ステージ名} … 小さめアイコン（data/stages/icon、Dashboard パネル用）
   nodecg.mount(
