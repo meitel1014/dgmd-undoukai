@@ -48,7 +48,7 @@
   border: 4px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
   background: #111;
-  transition: filter 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: filter 0.3s ease, border-color 0.45s ease, transform 0.2s ease, box-shadow 0.45s ease;
 }
 
 .stage-cell__icon {
@@ -72,17 +72,19 @@
 /* 画像内左下のステージ名 */
 .stage-cell__name {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 7px;
-  font-size: 20px;
-  font-weight: 700;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  font-size: 24px;
+  font-weight: 800;
   line-height: 1.15;
   color: #fff;
   font-family: 'M PLUS Rounded 1c', sans-serif;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
   text-align: left;
   pointer-events: none;
+  /* BAN の × マーク（赤オーバーレイ）より前面にステージ名を表示する */
+  z-index: 2;
 }
 
 /* BAN 用の × マーク */
@@ -100,6 +102,15 @@
   background: rgba(239, 68, 68, 0.3);
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
   pointer-events: none;
+  /* 既定は非表示。BAN 確定でフェードイン、戻るでフェードアウト。 */
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  /* ステージ名（z-index: 2）より下に置く */
+  z-index: 1;
+}
+
+.stage-cell__ban-mark--on {
+  opacity: 1;
 }
 
 /* ── 状態別スタイル ───────────────────────── */
@@ -109,11 +120,43 @@
   border-color: rgba(255, 255, 255, 0.85);
 }
 
-/* PICK: 金の強調枠（外枠の Glow は付けない） */
+/* PICK: 黄色フィルターが2回点滅→点灯したまま（拡縮はしない）。
+   フィルターは ::before オーバーレイで表現し、name（z-index:2）より下に敷く。 */
 .stage-cell--pick {
   border-color: #ffd447;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
-  transform: scale(1.06);
+}
+
+.stage-cell--pick::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 212, 71, 0.35);
+  z-index: 1;
+  pointer-events: none;
+  /* 2回点滅してから点灯したまま（forwards で最終 opacity を保持） */
+  animation: pick-flash 1.4s ease-in-out forwards;
+}
+
+@keyframes pick-flash {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  36% {
+    opacity: 0;
+  }
+  54% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* BAN: Control 側と同様の赤いエフェクト（赤枠 + 赤オーバーレイ + ×）。

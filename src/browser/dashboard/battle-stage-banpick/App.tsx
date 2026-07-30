@@ -1,5 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
 import { useReplicant } from '../../hooks/useReplicant';
 import { stripHtml } from '@/browser/utils/stripHtml';
+import { Html } from '@/browser/components/Html';
 import type { StageBanpick, MatchStage } from '@/schemas';
 
 const DEFAULT_BP: StageBanpick = { history: [], banned: [], picked: null, phase: 'pick' };
@@ -13,7 +15,8 @@ function stageThumbUrl(name: string): string {
 }
 
 // ステージアイコン + 左下に小さめの名前 + 下部の黒グラデーションを描くタイル。
-function StageTile({ name }: { name: string }) {
+// label は <br> 等の改行指定を含みうるため Html 経由で描画する（省略時は name）。
+function StageTile({ name, label }: { name: string; label?: string }) {
   return (
     <>
       <img
@@ -25,7 +28,7 @@ function StageTile({ name }: { name: string }) {
         }}
       />
       <span className="stage-btn__grad" />
-      <span className="stage-btn__name">{name}</span>
+      <Html as="span" className="stage-btn__name" value={label ?? name} />
     </>
   );
 }
@@ -45,14 +48,18 @@ function advanceMatchStage(ms: MatchStage, regulationRounds: number): MatchStage
 export function StageBanpickPanel() {
   const [stagePool] = useReplicant('stagePool');
   const [stageBanpick, setStageBanpick] = useReplicant('stageBanpick');
-  const [detectedStage] = useReplicant('detectedStage');
+  const [detectedStage, setDetectedStage] = useReplicant('detectedStage');
   const [matchStage, setMatchStage] = useReplicant('matchStage');
   const [regulationRounds] = useReplicant('regulationRounds');
   const [winTarget] = useReplicant('winTarget');
+  const [winCount] = useReplicant('winCount');
   const [, setSelection] = useReplicant('selection');
 
-  const pool = stagePool ?? { starter: [], counter: [] };
+  const pool = stagePool ?? { starter: [], counter: [], labels: {} };
   const bp = stageBanpick ?? DEFAULT_BP;
+
+  // ステージ名 → 表示ラベル（<br> 等を含みうる）。未登録は名前そのまま。
+  const labelOf = (name: string) => pool.labels[name] ?? name;
 
   const currentGame = bp.history.length + 1;
   const isGame1 = bp.history.length === 0;
@@ -62,11 +69,9 @@ export function StageBanpickPanel() {
   const maxGames = (winTarget ?? 2) * 2 - 1;
   const isLastGame = currentGame >= maxGames;
 
-  // 選択グリッドに並べるステージ。スターター＋カウンターの全プール（重複除去）。
-  // 1試合目は本来スターターからのおまかせだが、念のためカウンターも手動選択できるよう
-  // 全ステージを選べるようにする。使用済みは各ボタン側で無効化する。
-  const fullPool = [...new Set([...pool.starter, ...pool.counter])];
-  const counterSet = new Set(pool.counter);
+  // 選択グリッドに並べるステージ。1試合目はスターターのみ（カウンターは選ばれないため非表示）、
+  // 2試合目以降はスターター＋カウンターの全プール（重複除去）。使用済みは各ボタン側で無効化する。
+  const fullPool = isGame1 ? pool.starter : [...new Set([...pool.starter, ...pool.counter])];
   const usedSet = new Set(bp.history);
 
   // ── 操作ハンドラ ──────────────────────────────
@@ -112,10 +117,66 @@ export function StageBanpickPanel() {
     });
   };
 
-  const applyDetected = () => {
-    const name = detectedStage?.stageName;
-    if (name) setStageBanpick({ ...bp, picked: name });
-  };
+  // 第1試合の確定前に /stage による新しいステージ判別が来たら、選択を自動で上書きする。
+  // 判別結果（stageName + score）が変化したときだけ適用し、パネル再表示時の永続値の
+  // 再適用は避ける（初回はシグネチャを記録するだけ）。
+  const detStageName = detectedStage?.stageName ?? null;
+  const detScore = detectedStage?.score ?? 0;
+  const lastDetectionRef = useRef<string | null>(null);
+  const mountedRef = useRef(false);
+
+  // 判別が来たことを示す点滅（確定ボタンまでの領域）。
+  const [flashing, setFlashing] = useState(false);
+  const flashTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const sig = detStageName ? `${detStageName}:${detScore}` : null;
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      lastDetectionRef.current = sig; // 初回（永続値）は記録のみ・適用しない
+      return;
+    }
+    if (sig === lastDetectionRef.current) return;
+    lastDetectionRef.current = sig;
+    // 第1試合かつ確定前（pick フェーズ）のときだけ、判別ステージで上書きし点滅で通知。
+    if (detStageName && isGame1 && bp.phase === 'pick') {
+      setStageBanpick({ ...bp, picked: detStageName });
+      // いったん解除→次フレームで付与し、連続判別でもアニメーションを再スタートさせる。
+      if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+      setFlashing(false);
+      window.requestAnimationFrame(() => setFlashing(true));
+      flashTimerRef.current = window.setTimeout(() => {
+        setFlashing(false);
+        flashTimerRef.current = null;
+      }, 4000);
+    }
+  }, [detStageName, detScore, isGame1, bp, setStageBanpick]);
+
+  // /result で勝敗が入って winCount 合計が増えたら、現在のステージが確定済みの状態
+  // （第1試合=選択済みの pick / 第2試合以降=confirmed）に限り、自動で次の試合の BAN へ進む。
+  const winTotal = (winCount?.alpha ?? 0) + (winCount?.bravo ?? 0);
+  const prevWinTotalRef = useRef<number | null>(null);
+  const mountedWinRef = useRef(false);
+  useEffect(() => {
+    if (!mountedWinRef.current) {
+      mountedWinRef.current = true;
+      prevWinTotalRef.current = winTotal; // 初回（永続値）は記録のみ
+      return;
+    }
+    const prev = prevWinTotalRef.current ?? 0;
+    prevWinTotalRef.current = winTotal;
+    if (winTotal <= prev) return; // 勝敗が入った（合計増加）ときのみ。reset 等は無視
+    // マッチが決着（どちらかが必要勝利数に到達）した場合は次の試合が無いので進めない。
+    const target = winTarget ?? 2;
+    const decided = (winCount?.alpha ?? 0) >= target || (winCount?.bravo ?? 0) >= target;
+    if (decided || isLastGame) return;
+
+    const stageDecided =
+      !!bp.picked && ((isGame1 && bp.phase === 'pick') || (!isGame1 && bp.phase === 'confirmed'));
+    if (stageDecided) {
+      setStageBanpick({ history: [...bp.history, bp.picked!], banned: [], picked: null, phase: 'ban' });
+    }
+  }, [winTotal, winCount, winTarget, isGame1, isLastGame, bp, setStageBanpick]);
 
   // 一つ前の段階へ戻る。
   const canGoBack =
@@ -142,10 +203,15 @@ export function StageBanpickPanel() {
     }
   };
 
-  const reset = () => setStageBanpick(DEFAULT_BP);
+  // 前マッチの自動判別結果が残らないよう、リセット時は detectedStage も破棄する。
+  const reset = () => {
+    setStageBanpick(DEFAULT_BP);
+    setDetectedStage({ stageName: null, score: 0 });
+  };
 
   const resetAndNextMatch = () => {
     setStageBanpick(DEFAULT_BP);
+    setDetectedStage({ stageName: null, score: 0 });
     setSelection({ alpha: null, bravo: null });
     setMatchStage(advanceMatchStage(matchStage ?? DEFAULT_MS, regulationRounds ?? 3));
   };
@@ -157,8 +223,6 @@ export function StageBanpickPanel() {
     if (usedSet.has(name)) classes.push('stage-btn--used');
     if (bp.banned.includes(name)) classes.push('stage-btn--ban');
     if (bp.picked === name) classes.push('stage-btn--pick');
-    // 1試合目のカウンターは通常プール外（手動選択のみ）なので控えめに表示。
-    if (isGame1 && counterSet.has(name)) classes.push('stage-btn--offpool');
     return classes.join(' ');
   };
 
@@ -176,12 +240,16 @@ export function StageBanpickPanel() {
 
   return (
     <div className="banpick-panel">
+      {/* ステージ選択〜確定ボタンの領域。自動判別が来たら点滅して通知する。 */}
+      <div className={`banpick-select-region${flashing ? ' banpick-flash' : ''}`}>
       <div className="banpick-head">
         <span className="banpick-game">第{currentGame}試合 / 最大{maxGames}試合</span>
-        <span className="banpick-phase">{isGame1 ? '手動選択（スターター推奨）' : phaseLabel}</span>
+        <span className={`banpick-phase banpick-phase--${bp.phase}`}>
+          {isGame1 ? 'スターターからおまかせ' : phaseLabel}
+        </span>
       </div>
 
-      {/* 1試合目の自動判別候補 */}
+      {/* 1試合目の自動判別結果（判別され次第、選択へ自動反映される） */}
       {isGame1 && bp.phase !== 'confirmed' && (
         <div className="banpick-detect">
           <span>
@@ -190,13 +258,6 @@ export function StageBanpickPanel() {
               ? `${detectedStage.stageName}（${(detectedStage.score * 100).toFixed(1)}%）`
               : '未判別'}
           </span>
-          <button
-            className="btn-sm"
-            disabled={!detectedStage?.stageName}
-            onClick={applyDetected}
-          >
-            採用
-          </button>
         </div>
       )}
 
@@ -210,7 +271,7 @@ export function StageBanpickPanel() {
               disabled={usedSet.has(name) || (bp.phase === 'pick' && bp.banned.includes(name))}
               onClick={() => onStageClick(name)}
             >
-              <StageTile name={name} />
+              <StageTile name={name} label={labelOf(name)} />
             </button>
           ))}
         </div>
@@ -219,7 +280,7 @@ export function StageBanpickPanel() {
       {/* 確定表示（テキスト表記 + 左にアイコン） */}
       {bp.phase === 'confirmed' && (
         <div className="banpick-confirmed">
-          <span className="banpick-confirmed-label">確定ステージ</span>
+          <span className="banpick-confirmed-label">選択ステージ</span>
           <div className="banpick-confirmed-body">
             {bp.picked && (
               <img
@@ -245,7 +306,7 @@ export function StageBanpickPanel() {
         )}
         {bp.phase === 'pick' && (
           <button className="btn" disabled={!bp.picked} onClick={confirmPick}>
-            {isGame1 ? '確定' : '確定（PICK）'}
+            {isGame1 ? (isLastGame ? '確定' : '確定して次の試合へ') : '確定（PICK）'}
           </button>
         )}
         {bp.phase === 'confirmed' && (
@@ -253,6 +314,7 @@ export function StageBanpickPanel() {
             {isLastGame ? `最終試合（BO${maxGames}）` : '次の試合へ'}
           </button>
         )}
+      </div>
       </div>
 
       {/* 戻る / リセット系 */}
@@ -278,7 +340,7 @@ export function StageBanpickPanel() {
             {bp.history.map((name, i) => (
               <div key={i} className="history-item">
                 <div className="stage-btn history-item__tile">
-                  <StageTile name={name} />
+                  <StageTile name={name} label={labelOf(name)} />
                 </div>
                 <span className="history-item__label">第{i + 1}試合</span>
               </div>

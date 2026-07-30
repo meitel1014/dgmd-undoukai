@@ -13,11 +13,12 @@ type StageStatus = 'normal' | 'ban' | 'pick' | 'used' | 'inactive';
  * 現在の banpick 状態と「カウンターか否か」から、そのステージの表示状態を決める。
  * 優先度: pick > ban > used > (1試合目のカウンターは inactive) > normal
  *
- * BAN は Control 側で確定（ban フェーズを抜けた）後のみ表示する。
- * ban フェーズ中（選択作業中）は Graphic に反映しない。
+ * Control 側で確定した後のみ Graphic に反映する（選択作業中は出さない）:
+ * - PICK は「確定（PICK）」後（phase === 'confirmed'）のみ表示。
+ * - BAN は「確定（BAN）」後（ban フェーズを抜けた後）のみ表示。
  */
 function stageStatus(name: string, bp: StageBanpick, isCounter: boolean): StageStatus {
-  if (bp.picked === name) return 'pick';
+  if (bp.phase === 'confirmed' && bp.picked === name) return 'pick';
   if (bp.phase !== 'ban' && bp.banned.includes(name)) return 'ban';
   if (bp.history.includes(name)) return 'used';
   // 1試合目（history 空）はスターターのみが対象。カウンターはプール外なのでディム表示。
@@ -39,7 +40,10 @@ function StageCell({ name, label, status }: { name: string; label: string; statu
       <span className="stage-cell__grad" />
       {/* label は <br> 等の改行指定を含みうるため Html 経由で描画 */}
       <Html as="span" className="stage-cell__name" value={label} />
-      {status === 'ban' && <span className="stage-cell__ban-mark">✕</span>}
+      {/* BAN の赤エフェクト。常時マウントし opacity で表示切替（確定でフェードイン／戻るでフェードアウト） */}
+      <span className={`stage-cell__ban-mark${status === 'ban' ? ' stage-cell__ban-mark--on' : ''}`}>
+        ✕
+      </span>
     </div>
   );
 }
@@ -47,14 +51,17 @@ function StageCell({ name, label, status }: { name: string; label: string; statu
 function StageBanpickGraphic() {
   const [stagePool] = useReplicant('stagePool');
   const [stageBanpick] = useReplicant('stageBanpick');
+  const [champion] = useReplicant('champion');
 
   const pool = stagePool ?? { starter: [], counter: [], labels: {} };
   const bp: StageBanpick = stageBanpick ?? { history: [], banned: [], picked: null, phase: 'pick' };
 
-  // 1試合目（history 空）はスターターからのおまかせなので、バンピックの様子は表示しない。
-  // 表示/非表示は opacity の切り替えで行い、出現時・消滅（リセット）時に
-  // フェードイン/アウトさせる（アンマウントすると退場アニメが効かないため常時マウント）。
-  const visible = bp.history.length > 0;
+  // 表示条件:
+  // - 1試合目（history 空）はスターターからのおまかせなので非表示。
+  // - どちらかが規定勝利数に達して優勝確定（champion.side）したら、以降バンピックは無いので非表示。
+  // 表示/非表示は opacity の切り替えで行い、出現時・消滅時にフェードイン/アウトさせる
+  // （アンマウントすると退場アニメが効かないため常時マウント）。
+  const visible = bp.history.length > 0 && !champion?.side;
 
   // 消滅時に「最後の可視状態のまま」薄れさせるため、可視中はスナップショットを更新し、
   // 非可視になったら直前のスナップショットを表示し続ける（リセットで素の状態に戻る前の見た目を保持）。

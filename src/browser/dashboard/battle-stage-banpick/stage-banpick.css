@@ -8,11 +8,36 @@
   -webkit-user-select: none;
 }
 
+/* ステージ選択〜確定ボタンの領域。ラップしても元の縦並び・間隔を保つ。 */
+.banpick-select-region {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 6px;
+}
+
+/* 自動判別が来たときのゆっくり点滅（デジフェスの flash を踏襲） */
+@keyframes banpick-detect-flash {
+  0%,
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0 rgba(255, 220, 60, 0);
+  }
+  50% {
+    background-color: rgba(255, 220, 60, 0.16);
+    box-shadow: 0 0 0 2px rgba(255, 220, 60, 0.55);
+  }
+}
+
+.banpick-flash {
+  animation: banpick-detect-flash 1.2s ease-in-out 3;
+}
+
 .banpick-head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .banpick-game {
@@ -20,9 +45,32 @@
   font-weight: 700;
 }
 
+/* 段階表示。試合数の下に置き、段階ごとに色を変えたバッジにする。 */
 .banpick-phase {
   font-size: 14px;
+  font-weight: 700;
+  padding: 2px 12px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
   color: var(--text-muted);
+}
+
+/* BAN 中: 赤 */
+.banpick-phase--ban {
+  color: var(--accent-danger);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* PICK 中（1試合目のおまかせ含む）: 黄 */
+.banpick-phase--pick {
+  color: #ffd447;
+  background: rgba(255, 212, 71, 0.14);
+}
+
+/* 確定: 緑 */
+.banpick-phase--confirmed {
+  color: var(--accent-success);
+  background: rgba(34, 197, 94, 0.14);
 }
 
 /* 自動判別候補 */
@@ -106,12 +154,6 @@
 .stage-btn--used {
   filter: grayscale(1) brightness(0.5);
   opacity: 0.6;
-}
-
-/* 1試合目のカウンター（通常プール外・手動選択のみ）: 控えめに */
-.stage-btn--offpool {
-  opacity: 0.7;
-  border-style: dashed;
 }
 
 /* BAN: 赤枠 + 赤オーバーレイ + × マーク */
