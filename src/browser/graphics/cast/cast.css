@@ -7,7 +7,7 @@
   bottom: 249px;
   transform: translateY(50%);
   left: 240px;
-  font-size: 80px;
+  font-size: 72px;
 }
 
 .cast-layout--main .role--commentator {
@@ -16,7 +16,11 @@
   bottom: 249px;
   transform: translateY(50%);
   left: 1080px;
-  font-size: 80px;
+  font-size: 72px;
+}
+
+.cast-layout--main .cast-name {
+  margin-top: 9px;
 }
 
 /* main レイアウトのアイコンサイズ・余白（後で手動調整） */

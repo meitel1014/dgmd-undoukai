@@ -1,9 +1,11 @@
 /* cast graphic 共通: コンテナ・役職ごとの枠スタイル */
 
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&family=Varela+Round&display=swap');
+
 .cast-graphic {
-  font-family: 'vdl-v7marugothic', sans-serif;
+  font-family: 'M PLUS Rounded 1c', sans-serif;
   font-weight: 800;
-  color: #000000;
+  color: #303030;
   position: relative;
   width: 1920px;
   height: 1080px;
