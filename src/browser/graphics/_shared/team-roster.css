@@ -69,7 +69,8 @@
 .roster-player-weapons {
   display: flex;
   gap: 25px;
-  min-width: 400px;
+  width: 400px;
+  height: 110px;
 }
 
 .roster-weapon-icon {
