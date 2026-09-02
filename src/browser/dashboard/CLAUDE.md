@@ -20,7 +20,7 @@
 
 ## `_shared/` コンポーネントの実装メモ
 
-- **PreviewEditPanel**: アルファ/ブラボーを単一 `<table>` で横並びにして行高を揃える（2 列グリッドでは編集行の高さがズレる）。スペーサー列（`preview-spacer-col`、`min-width: 16px`、`border: none`）でサイド間の空白を確保。編集可能な項目はチーム表示名（`viewname`）とプレイヤー名のみ。
+- **PreviewEditPanel**: アルファ/ブラボーを単一 `<table>` で横並びにして行高を揃える（2 列グリッドでは編集行の高さがズレる）。スペーサー列（`preview-spacer-col`、`min-width: 16px`、`border: none`）でサイド間の空白を確保。編集可能な項目はチーム表示名（`viewname`）・プレイヤー名・意気込み（`comment`）。意気込み行はプレイヤー4行と本数行の間に置き、`updateTeam` の `patch.comment` で更新する（Enter 保存 / Escape 取消。改行は `<br>` で表現する）。
 - **CSV アップロード**: `settings-csv-reload` パネルはファイル選択で `POST /upload-teams-csv` へ送信。`useReloadButton` フックで再読込ボタンの状態管理（`idle` / `loading` / `done` / `error`）を共通化。
 - **スプレッドシート再読込**: 同パネルに「スプレッドシートから再読込」ボタンを併設（`reloadTeamsFromSheets` メッセージ）。失敗時は既存の `teamsPool` を変更しない。
 - **担当者リスト読込**: `settings-cast-upload` パネルはファイル選択で `POST /upload-cast-json` へ送信し `castCandidates` を再初期化。`data/cast.json` からの再読込（`reloadCastJson` メッセージ）も併設。

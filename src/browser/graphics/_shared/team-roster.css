@@ -23,11 +23,11 @@
 /* 位置決め＋上下左右中央寄せの外箱（固定位置・固定サイズ） */
 .roster-team-name-box {
   position: absolute;
-  top: 60px;
+  top: 48px;
   left: 50%;
   transform: translateX(-50%);
   width: 1000px;
-  height: 190px; /* 縦中央寄せの基準。名前欄の高さ。要調整 */
+  height: 160px; /* 縦中央寄せの基準。名前欄の高さ。要調整 */
   display: flex;
   align-items: center; /* 縦中央 */
   justify-content: center; /* 横中央 */
@@ -42,17 +42,18 @@
 }
 
 .roster-team-name small{
-  font-size: 40px;
+  font-size: 36px;
 }
 
+/* 4 行 × 110px（行高は武器アイコンで決まる）+ gap 70px × 3 = 650px → 下端 920px */
 .roster-players {
   position: absolute;
-  top: 323px;
+  top: 267px;
   left: 200px;
   width: 1650px;
   display: flex;
   flex-direction: column;
-  gap: 75px;
+  gap: 46px;
 }
 
 .roster-player {
@@ -82,4 +83,27 @@
   font-size: 28px;
   font-weight: 800;
   opacity: 0.8;
+}
+
+/* ── 意気込み（メンバー一覧の下） ── */
+
+/* 位置決め＋縦中央寄せの外箱。.roster-players の下端（920px）直下に置く。
+   下端 = 936 + 96 = 1032px（1080px 枠の下 48px を残す）。FitText で 1 行に収めて自動縮小する。 */
+.roster-comment-box {
+  position: absolute;
+  top: 897px;
+  left: 200px;
+  width: 1650px;
+  height: 96px; /* 縦中央寄せの基準。要調整 */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* FitText 本体。外箱の中で縮むだけ */
+.roster-comment {
+  width: 100%;
+  font-size: 40px;
+  line-height: 1.0;
+  text-align: center;
 }

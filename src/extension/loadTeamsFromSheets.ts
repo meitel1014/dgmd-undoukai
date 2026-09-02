@@ -24,6 +24,14 @@ function normalizeXId(raw: string): string {
   return raw.trim().replace(/^@/, '').toLowerCase();
 }
 
+/**
+ * 「意気込み」または「コメント」を列名に含む列を検出する。
+ * フォームの見出し文は大会ごとに変わるため部分一致で拾う。
+ */
+function findCommentColumn(headerValues: string[]): string | undefined {
+  return headerValues.find((h) => h.includes('意気込み') || h.includes('コメント'));
+}
+
 function findPlayerColumn(
   headerValues: string[],
   playerNum: 0 | 1 | 2 | 3,
@@ -97,6 +105,11 @@ export async function loadTeamsFromSheets(log: Log): Promise<TeamsPool | null> {
       xid: findPlayerColumn(appHeader, i, 'xid'),
     }));
 
+    const commentCol = findCommentColumn(appHeader);
+    if (!commentCol) {
+      log.warn('[loadTeamsFromSheets] 申請フォームに「意気込み」/「コメント」列が見つかりません（意気込みは空になります）');
+    }
+
     const pool: TeamsPool = [];
     let serial = 0;
 
@@ -124,6 +137,7 @@ export async function loadTeamsFromSheets(log: Log): Promise<TeamsPool | null> {
         id: String(serial),
         name: teamName,
         viewname: teamName,
+        comment: commentCol ? String(row.get(commentCol) ?? '').trim() : '',
         players,
       };
       pool.push(team);

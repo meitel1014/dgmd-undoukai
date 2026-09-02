@@ -27,10 +27,12 @@ export function PreviewEditPanel() {
   const [winCount, setWinCount] = useReplicant('winCount');
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [editPlayer, setEditPlayer] = useState<EditPlayerTarget | null>(null);
+  const [editComment, setEditComment] = useState<EditTarget | null>(null);
 
   useEffect(() => {
     setEditTarget(null);
     setEditPlayer(null);
+    setEditComment(null);
   }, [selection?.alpha, selection?.bravo]);
 
   if (!teamsPool || !selection) return <p>読み込み中…</p>;
@@ -44,6 +46,7 @@ export function PreviewEditPanel() {
   // ── チーム表示名の編集 ──
   const startEdit = (side: Side, team: Team) => {
     setEditPlayer(null);
+    setEditComment(null);
     setEditTarget({ side, value: team.viewname });
   };
   const cancelEdit = () => setEditTarget(null);
@@ -65,6 +68,7 @@ export function PreviewEditPanel() {
   // ── プレイヤー名の編集 ──
   const startPlayerEdit = (side: Side, idx: number, playerName: string) => {
     setEditTarget(null);
+    setEditComment(null);
     setEditPlayer({ side, idx, oldPlayerName: playerName, value: playerName });
   };
   const cancelPlayerEdit = () => setEditPlayer(null);
@@ -88,6 +92,29 @@ export function PreviewEditPanel() {
   const handlePlayerKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') savePlayerEdit();
     if (e.key === 'Escape') cancelPlayerEdit();
+  };
+
+  // ── 意気込みの編集 ──
+  const startCommentEdit = (side: Side, team: Team) => {
+    setEditTarget(null);
+    setEditPlayer(null);
+    // 旧 Replicant 永続値には comment が無い場合がある（JSON Schema 上は任意）
+    setEditComment({ side, value: team.comment ?? '' });
+  };
+  const cancelCommentEdit = () => setEditComment(null);
+  const saveCommentEdit = () => {
+    if (!editComment) return;
+    const team = editComment.side === 'alpha' ? alphaTeam : bravoTeam;
+    if (!team) return;
+    void nodecg.sendMessage('updateTeam', {
+      teamId: team.id,
+      patch: { comment: editComment.value },
+    });
+    setEditComment(null);
+  };
+  const handleCommentKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') saveCommentEdit();
+    if (e.key === 'Escape') cancelCommentEdit();
   };
 
   // ── 勝利数（本数）の操作 ──
@@ -223,6 +250,53 @@ export function PreviewEditPanel() {
     );
   };
 
+  const renderCommentCells = (side: Side, team: Team | null) => {
+    const labelClass = `preview-row-label${side === 'bravo' ? ' preview-bravo-col' : ''}`;
+    if (!team) {
+      return (
+        <>
+          <th className={labelClass}>意気込み</th>
+          <td />
+          <td className="action-cell" />
+        </>
+      );
+    }
+    const comment = team.comment ?? '';
+    const isEditing = editComment?.side === side;
+    return (
+      <>
+        <th className={labelClass}>意気込み</th>
+        <td>
+          {isEditing ? (
+            <input
+              className="edit-input"
+              value={editComment.value}
+              onChange={(e) => setEditComment({ ...editComment, value: e.target.value })}
+              onKeyDown={handleCommentKeyDown}
+              autoFocus
+            />
+          ) : (
+            <span className="field-value preview-comment-value">
+              {stripHtml(comment) || '(空欄)'}
+            </span>
+          )}
+        </td>
+        <td className="action-cell">
+          {isEditing ? (
+            <>
+              <button className="btn-sm btn-save" onClick={saveCommentEdit}>保存</button>
+              <button className="btn-sm btn-cancel" onClick={cancelCommentEdit}>取消</button>
+            </>
+          ) : (
+            <button className="btn-sm btn-edit" onClick={() => startCommentEdit(side, team)}>
+              編集
+            </button>
+          )}
+        </td>
+      </>
+    );
+  };
+
   const renderWinCountCells = (side: Side) => {
     const labelClass = `preview-row-label${side === 'bravo' ? ' preview-bravo-col' : ''}`;
     const team = side === 'alpha' ? alphaTeam : bravoTeam;
@@ -299,6 +373,11 @@ export function PreviewEditPanel() {
               </tr>
             </Fragment>
           ))}
+          <tr>
+            {renderCommentCells('alpha', alphaTeam)}
+            <td className="preview-spacer-col" />
+            {renderCommentCells('bravo', bravoTeam)}
+          </tr>
           <tr className="preview-win-row">
             {renderWinCountCells('alpha')}
             <td className="preview-spacer-col" />

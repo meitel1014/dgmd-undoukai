@@ -19,11 +19,15 @@ export const playerSchema = z.object({
  * `name`     : チーム名原本。records.csv 出力・Dashboard 表示に使う。編集禁止。
  * `viewname` : 表示用チーム名。`<br>` 等の生 HTML を含む場合がある。
  *              Dashboard から自由に編集でき、Graphic でのみ参照する。
+ * `comment`  : 意気込み。申請フォームの「意気込み」/「コメント」列由来。
+ *              `<br>` 等の生 HTML を含む場合がある。Dashboard から自由に編集可。
+ *              既存の永続 Replicant との互換のため `.default('')`（JSON Schema 上は任意）。
  */
 export const teamSchema = z.object({
   id: z.string(),
   name: z.string(),
   viewname: z.string(),
+  comment: z.string().default(''),
   players: z.tuple([playerSchema, playerSchema, playerSchema, playerSchema]),
 });
 

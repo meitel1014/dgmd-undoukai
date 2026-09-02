@@ -91,6 +91,7 @@ Replicant は NodeCG の `db/` に自動永続化される。編集内容はプ�
 | `team.id` | 読み込み時に割り振る**連番文字列**（"1","2","3"...）。Replicant 内の検索キー。変更不可。 |
 | `team.name` | チーム名原本。編集禁止。**Graphic 以外**（Dashboard 表示）で使う。 |
 | `team.viewname` | 表示用チーム名。`<br>` 等の HTML タグを含む場合がある。Dashboard から自由編集可。**Graphic でのみ使う**。 |
+| `team.comment` | 意気込み。申請フォームの「意気込み」/「コメント」を含む列由来。`<br>` 等の HTML タグを含む場合がある。Dashboard から自由編集可。`team-roster-*` Graphic でメンバー一覧の下に表示。 |
 | `team.players[].name` | プレイヤー名。Dashboard から編集可。 |
 | `team.players[].xId` | X(Twitter) ID の生値（`@`の有無は問わない）。CSV由来の場合は空文字。表示側で`@`を正規化して付与する。 |
 | `team.players[].weapons` | 持ちブキ（`data/weapon_aliases.csv` の `id` 列）の配列。CSV由来の場合は空配列。表示は先頭から最大3件。 |

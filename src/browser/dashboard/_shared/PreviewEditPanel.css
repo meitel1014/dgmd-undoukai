@@ -189,3 +189,12 @@ a.preview-player-xid:hover {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── 意気込み行 ── */
+
+/* 長文になりやすいので折り返して表示（行高は内容に応じて伸びる） */
+.preview-comment-value {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}

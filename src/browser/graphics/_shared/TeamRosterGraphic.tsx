@@ -21,6 +21,8 @@ function PlayerRow({ player }: { player: Player }) {
 
 export function TeamRosterGraphic({ side }: { side: Side }) {
   const { team } = useTeamData(side);
+  // 旧 Replicant 永続値には comment が無い場合がある（JSON Schema 上は任意）
+  const comment = team?.comment ?? '';
 
   return (
     <div className={`roster-container roster-${side}`}>
@@ -34,6 +36,11 @@ export function TeamRosterGraphic({ side }: { side: Side }) {
               <PlayerRow key={i} player={p} />
             ))}
           </div>
+          {comment && (
+            <div className="roster-comment-box">
+              <FitText html={comment} align="left" className="roster-comment" />
+            </div>
+          )}
         </>
       )}
     </div>

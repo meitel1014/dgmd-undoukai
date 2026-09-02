@@ -22,6 +22,14 @@ function findPlayerColumnIndex(header: string[], playerNum: 0 | 1 | 2 | 3): numb
 }
 
 /**
+ * 「意気込み」または「コメント」を列名に含む列のインデックスを返す。
+ * loadTeamsFromSheets.ts の findCommentColumn と同じ検出方針。
+ */
+function findCommentColumnIndex(header: string[]): number {
+  return header.findIndex((h) => h.includes('意気込み') || h.includes('コメント'));
+}
+
+/**
  * CSV テキストを直接受け取って TeamsPool を構築する。
  * ファイルには書き込まない。
  */
@@ -36,6 +44,7 @@ export function parseTeamsPoolFromCsvText(raw: string): TeamsPool {
   const idx = {
     name:     header.indexOf('チーム名'),
     viewname: header.indexOf('チーム名(表示用)'),
+    comment:  findCommentColumnIndex(header),
     players: [
       findPlayerColumnIndex(header, 0),
       findPlayerColumnIndex(header, 1),
@@ -53,6 +62,7 @@ export function parseTeamsPoolFromCsvText(raw: string): TeamsPool {
 
     serial++;
     const rawViewname = idx.viewname >= 0 ? (row[idx.viewname] ?? '').trim() : '';
+    const rawComment = idx.comment >= 0 ? (row[idx.comment] ?? '').trim() : '';
 
     const toPlayer = (colIdx: number): Player => ({
       name: colIdx >= 0 ? (row[colIdx] ?? '').trim() : '',
@@ -64,6 +74,7 @@ export function parseTeamsPoolFromCsvText(raw: string): TeamsPool {
       id:       String(serial),
       name:     rawName,
       viewname: rawViewname || rawName,
+      comment:  rawComment,
       players: [
         toPlayer(idx.players[0]),
         toPlayer(idx.players[1]),
