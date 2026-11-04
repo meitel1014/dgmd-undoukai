@@ -1,4 +1,4 @@
-import type { Team, Player, CastMembers } from '../schemas';
+import type { Team, Player } from '../schemas';
 
 export type Side = 'alpha' | 'bravo';
 
@@ -24,10 +24,4 @@ export type MessageMap = {
     };
   };
 
-  /** data/cast.json から castCandidates を再読み込み */
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- ts-nodecg の規約：データなしメッセージは {} で表現
-  reloadCastJson: {};
-
-  /** 4 役職の担当者名をまとめて適用 */
-  setCastMembers: { data: CastMembers };
 };
