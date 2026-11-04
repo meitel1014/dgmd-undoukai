@@ -97,37 +97,10 @@
   gap: 8px;
 }
 
-.preview-player-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
 
-.preview-player-weapons {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 4px;
-  width: 128px;
-  flex: none;
-  margin-left: auto;
-}
 
-.preview-weapon-icon {
-  width: 40px;
-  height: 40px;
-}
 
-.preview-player-xid {
-  font-size: 12px;
-  color: var(--text-muted);
-  text-decoration: none;
-}
 
-a.preview-player-xid:hover {
-  text-decoration: underline;
-}
 
 .action-cell {
   text-align: right;
@@ -190,11 +163,3 @@ a.preview-player-xid:hover {
   cursor: not-allowed;
 }
 
-/* ── 意気込み行 ── */
-
-/* 長文になりやすいので折り返して表示（行高は内容に応じて伸びる） */
-.preview-comment-value {
-  white-space: pre-wrap;
-  word-break: break-word;
-  line-height: 1.4;
-}

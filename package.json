@@ -17,17 +17,45 @@
     "compatibleRange": "^2.0.0",
     "dashboardPanels": [
       {
-        "name": "battle-team-select",
-        "title": "チーム選択",
-        "file": "battle-team-select.html",
-        "workspace": "Battle",
+        "name": "area-limited-team-select",
+        "title": "エリア制限｜チーム選択",
+        "file": "area-limited-team-select.html",
+        "workspace": "エリア制限",
         "width": 4
       },
       {
-        "name": "battle-preview",
-        "title": "プレビュー編集",
-        "file": "battle-preview.html",
-        "workspace": "Battle",
+        "name": "area-limited-preview",
+        "title": "エリア制限｜プレビュー編集",
+        "file": "area-limited-preview.html",
+        "workspace": "エリア制限",
+        "width": 8
+      },
+      {
+        "name": "area-unlimited-team-select",
+        "title": "エリア無制限｜チーム選択",
+        "file": "area-unlimited-team-select.html",
+        "workspace": "エリア無制限",
+        "width": 4
+      },
+      {
+        "name": "area-unlimited-preview",
+        "title": "エリア無制限｜プレビュー編集",
+        "file": "area-unlimited-preview.html",
+        "workspace": "エリア無制限",
+        "width": 8
+      },
+      {
+        "name": "turf-team-select",
+        "title": "ナワバリ｜チーム選択",
+        "file": "turf-team-select.html",
+        "workspace": "ナワバリ",
+        "width": 4
+      },
+      {
+        "name": "turf-preview",
+        "title": "ナワバリ｜プレビュー編集",
+        "file": "turf-preview.html",
+        "workspace": "ナワバリ",
         "width": 8
       },
       {
