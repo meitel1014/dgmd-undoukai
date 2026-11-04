@@ -1,0 +1,91 @@
+/* 対戦表示。座標はレイアウト画像の枠に合わせた仮置き。微調整は手動で行う。
+   フォント「でらすこゴシック」は配信 PC にインストール済みのものを使う（同梱しない）。 */
+
+/* でらすこゴシックはサブファミリー名が "R" のため、Windows の Chrome / OBS では
+   font-family: 'DelaSuko Gothic One'（ファミリー名）で解決できない。
+   local() でフルネーム / PostScript 名を指定すると解決できるので、別名を付けて使う。 */
+@font-face {
+  font-family: 'DelaSukoGothic';
+  src: local('DelaSuko Gothic One Regular'), local('DelaSukoGothicOne-R');
+}
+
+.battle-container {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  font-family: 'DelaSukoGothic', sans-serif;
+  color: #fff;
+}
+
+.battle-player {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  width: 320px;
+  height: 66px;
+  font-size: 48px;
+  line-height: 1;
+}
+
+.battle-player-1 { top: 686px; }
+.battle-player-2 { top: 758px; }
+.battle-player-3 { top: 830px; }
+.battle-player-4 { top: 902px; }
+
+.battle-alpha .battle-player {
+  left: 50px;
+  justify-content: flex-start;
+}
+
+.battle-bravo .battle-player {
+  right: 45px;
+  justify-content: flex-end;
+}
+
+/* FitText のルート div */
+.battle-player-name {
+  width: 100%;
+}
+
+.battle-bravo .battle-player-name {
+  text-align: right;
+}
+
+/* ── チーム名（下段の大きい黒バー: y 980〜1080） ── */
+.battle-team-name-box {
+  position: absolute;
+  top: 985px;
+  display: flex;
+  align-items: center;
+  width: 465px;
+  height: 100px;
+  font-size: 52px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.battle-alpha .battle-team-name-box { left: 75px; }
+.battle-bravo .battle-team-name-box { left: 1380px; }
+
+/* FitText のルート div */
+.battle-team-name {
+  width: 100%;
+}
+
+/* ── 勝利本数（黄 / 青のアクセント部分、中心 y≈1028） ── */
+.battle-win-count {
+  position: absolute;
+  top: 1028px;
+  width: 120px;
+  margin-left: -60px;
+  transform: translateY(-50%);
+  font-size: 80px;
+  line-height: 1;
+  text-align: center;
+  color: #333;
+  font-variant-numeric: tabular-nums;
+}
+
+.battle-alpha .battle-win-count { left: 640px; }
+.battle-bravo .battle-win-count { left: 1280px; }

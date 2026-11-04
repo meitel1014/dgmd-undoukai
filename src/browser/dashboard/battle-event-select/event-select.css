@@ -1,0 +1,24 @@
+/* 種目選択パネル。ボタンの見た目は dashboard.css の .toggle-btn / .toggle-btn--on を流用する。 */
+
+.event-select-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.event-select-panel p {
+  font-size: 15px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.event-select-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.event-select-buttons .toggle-btn {
+  flex: 1;
+  padding: 10px 0;
+  font-size: 16px;
+}

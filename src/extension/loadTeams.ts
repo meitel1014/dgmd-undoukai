@@ -1,92 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseCsv } from './csv';
-import type { TeamsPool, Team, Player } from '../schemas';
+import { parseTeamsGrid } from './parseTeamsGrid';
+import type { TeamsPool } from '../schemas';
 
 const CSV_PATH = path.resolve(process.cwd(), 'data/teams.csv');
 
 /**
- * 半角数字 / 全角数字 / 丸数字のいずれかを列名に含む列のインデックスを返す。
- * 申請フォームによる表記揺れに対応するため柔軟に検出する。
- */
-const PLAYER_DIGITS = [
-  ['1', '１', '①'],
-  ['2', '２', '②'],
-  ['3', '３', '③'],
-  ['4', '４', '④'],
-] as const;
-
-function findPlayerColumnIndex(header: string[], playerNum: 0 | 1 | 2 | 3): number {
-  const digits = PLAYER_DIGITS[playerNum];
-  return header.findIndex((h) => digits.some((d) => h.includes(d)));
-}
-
-/**
- * 「意気込み」または「コメント」を列名に含む列のインデックスを返す。
- * loadTeamsFromSheets.ts の findCommentColumn と同じ検出方針。
- */
-function findCommentColumnIndex(header: string[]): number {
-  return header.findIndex((h) => h.includes('意気込み') || h.includes('コメント'));
-}
-
-/**
  * CSV テキストを直接受け取って TeamsPool を構築する。
- * ファイルには書き込まない。
+ * CSV は出場者スプレッドシートを CSV エクスポートしたものと同じ表形式。ファイルには書き込まない。
  */
 export function parseTeamsPoolFromCsvText(raw: string): TeamsPool {
-  const rows = parseCsv(raw);
-  if (rows.length === 0) {
-    return [];
-  }
-
-  const header = rows[0].map((h) => h.trim());
-
-  const idx = {
-    name:     header.indexOf('チーム名'),
-    viewname: header.indexOf('チーム名(表示用)'),
-    comment:  findCommentColumnIndex(header),
-    players: [
-      findPlayerColumnIndex(header, 0),
-      findPlayerColumnIndex(header, 1),
-      findPlayerColumnIndex(header, 2),
-      findPlayerColumnIndex(header, 3),
-    ] as [number, number, number, number],
-  };
-
-  const pool: TeamsPool = [];
-  let serial = 0;
-
-  for (const row of rows.slice(1)) {
-    const rawName = idx.name >= 0 ? (row[idx.name] ?? '').trim() : '';
-    if (rawName === '') continue;
-
-    serial++;
-    const rawViewname = idx.viewname >= 0 ? (row[idx.viewname] ?? '').trim() : '';
-    const rawComment = idx.comment >= 0 ? (row[idx.comment] ?? '').trim() : '';
-
-    const toPlayer = (colIdx: number): Player => ({
-      name: colIdx >= 0 ? (row[colIdx] ?? '').trim() : '',
-      xId: '',
-      weapons: [],
-    });
-
-    const team: Team = {
-      id:       String(serial),
-      name:     rawName,
-      viewname: rawViewname || rawName,
-      comment:  rawComment,
-      players: [
-        toPlayer(idx.players[0]),
-        toPlayer(idx.players[1]),
-        toPlayer(idx.players[2]),
-        toPlayer(idx.players[3]),
-      ],
-    };
-
-    pool.push(team);
-  }
-
-  return pool;
+  return parseTeamsGrid(parseCsv(raw), (msg) => console.warn(msg));
 }
 
 /** data/teams.csv を読んで TeamsPool を構築する。ファイルが存在しない場合は空を返す。 */

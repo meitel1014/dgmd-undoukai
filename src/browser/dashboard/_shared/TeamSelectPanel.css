@@ -11,3 +11,9 @@
 .field-bravo select:focus {
   border-color: var(--accent-bravo);
 }
+
+/* 現在の種目（種目選択パネルで切り替える） */
+.team-select-event {
+  font-size: 15px;
+  font-weight: bold;
+}

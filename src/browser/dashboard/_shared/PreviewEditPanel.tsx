@@ -1,11 +1,10 @@
 import './PreviewEditPanel.css';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useReplicant } from '../../hooks/useReplicant';
-import { formatXId, xProfileUrl } from '../../utils/formatXId';
 import { stripHtml } from '../../utils/stripHtml';
-import { weaponImageUrl } from '../../graphics/_shared/weaponImageUrl';
+import { WIN_TARGET } from '@/schemas';
 import type { Side } from '@/nodecg/messages';
-import type { Team, Player } from '@/schemas';
+import type { EventId, Team } from '@/schemas';
 
 type EditTarget = {
   side: Side;
@@ -14,39 +13,41 @@ type EditTarget = {
 
 type EditPlayerTarget = {
   side: Side;
-  idx: number;
+  idx: 0 | 1 | 2 | 3;
   oldPlayerName: string;
   value: string;
 };
 
 const PLAYER_LABELS = ['プレイヤー1', 'プレイヤー2', 'プレイヤー3', 'プレイヤー4'] as const;
+const PLAYER_INDEXES = [0, 1, 2, 3] as const;
 
 export function PreviewEditPanel() {
+  const [selection] = useReplicant('selection');
+  const [eventId] = useReplicant('currentEvent');
+  if (!eventId) return <p>読み込み中…</p>;
+  const current = selection?.[eventId];
+  // 種目・選択チームが変わったら編集中の状態を破棄する（key で作り直す）
+  return <PreviewEditTable key={`${eventId}-${current?.alpha}-${current?.bravo}`} eventId={eventId} />;
+}
+
+function PreviewEditTable({ eventId }: { eventId: EventId }) {
   const [teamsPool] = useReplicant('teamsPool');
   const [selection] = useReplicant('selection');
   const [winCount, setWinCount] = useReplicant('winCount');
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [editPlayer, setEditPlayer] = useState<EditPlayerTarget | null>(null);
-  const [editComment, setEditComment] = useState<EditTarget | null>(null);
-
-  useEffect(() => {
-    setEditTarget(null);
-    setEditPlayer(null);
-    setEditComment(null);
-  }, [selection?.alpha, selection?.bravo]);
 
   if (!teamsPool || !selection) return <p>読み込み中…</p>;
 
   const findTeam = (id: string | null) =>
     id ? teamsPool.find((t) => t.id === id) ?? null : null;
 
-  const alphaTeam = findTeam(selection.alpha);
-  const bravoTeam = findTeam(selection.bravo);
+  const alphaTeam = findTeam(selection[eventId].alpha);
+  const bravoTeam = findTeam(selection[eventId].bravo);
 
-  // ── チーム表示名の編集 ──
+  // ── チーム表示名の編集（全種目共通） ──
   const startEdit = (side: Side, team: Team) => {
     setEditPlayer(null);
-    setEditComment(null);
     setEditTarget({ side, value: team.viewname });
   };
   const cancelEdit = () => setEditTarget(null);
@@ -65,10 +66,9 @@ export function PreviewEditPanel() {
     if (e.key === 'Escape') cancelEdit();
   };
 
-  // ── プレイヤー名の編集 ──
-  const startPlayerEdit = (side: Side, idx: number, playerName: string) => {
+  // ── プレイヤー名の編集（この種目のみ） ──
+  const startPlayerEdit = (side: Side, idx: 0 | 1 | 2 | 3, playerName: string) => {
     setEditTarget(null);
-    setEditComment(null);
     setEditPlayer({ side, idx, oldPlayerName: playerName, value: playerName });
   };
   const cancelPlayerEdit = () => setEditPlayer(null);
@@ -81,11 +81,9 @@ export function PreviewEditPanel() {
       setEditPlayer(null);
       return;
     }
-    const patchPlayers: Partial<Player>[] = [];
-    patchPlayers[idx] = { name: newPlayerName };
     void nodecg.sendMessage('updateTeam', {
       teamId: team.id,
-      patch: { players: patchPlayers },
+      patch: { player: { eventId, index: idx, name: newPlayerName } },
     });
     setEditPlayer(null);
   };
@@ -94,33 +92,10 @@ export function PreviewEditPanel() {
     if (e.key === 'Escape') cancelPlayerEdit();
   };
 
-  // ── 意気込みの編集 ──
-  const startCommentEdit = (side: Side, team: Team) => {
-    setEditTarget(null);
-    setEditPlayer(null);
-    // 旧 Replicant 永続値には comment が無い場合がある（JSON Schema 上は任意）
-    setEditComment({ side, value: team.comment ?? '' });
-  };
-  const cancelCommentEdit = () => setEditComment(null);
-  const saveCommentEdit = () => {
-    if (!editComment) return;
-    const team = editComment.side === 'alpha' ? alphaTeam : bravoTeam;
-    if (!team) return;
-    void nodecg.sendMessage('updateTeam', {
-      teamId: team.id,
-      patch: { comment: editComment.value },
-    });
-    setEditComment(null);
-  };
-  const handleCommentKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') saveCommentEdit();
-    if (e.key === 'Escape') cancelCommentEdit();
-  };
-
-  // ── 勝利数（本数）の操作 ──
+  // ── 勝利数（本数）の操作。全種目共有、0〜WIN_TARGET ──
   const wc = winCount ?? { alpha: 0, bravo: 0 };
   const changeWin = (side: Side, delta: number) => {
-    setWinCount({ ...wc, [side]: Math.max(0, wc[side] + delta) });
+    setWinCount({ ...wc, [side]: Math.min(WIN_TARGET, Math.max(0, wc[side] + delta)) });
   };
   const resetWin = (side: Side) => {
     setWinCount({ ...wc, [side]: 0 });
@@ -172,7 +147,7 @@ export function PreviewEditPanel() {
     );
   };
 
-  const renderPlayerNameCells = (side: Side, team: Team | null, idx: number) => {
+  const renderPlayerNameCells = (side: Side, team: Team | null, idx: 0 | 1 | 2 | 3) => {
     const labelClass = `preview-row-label${side === 'bravo' ? ' preview-bravo-col' : ''}`;
     if (!team) {
       return (
@@ -183,8 +158,7 @@ export function PreviewEditPanel() {
         </>
       );
     }
-    const player = team.players[idx];
-    const playerName = player?.name ?? '';
+    const playerName = team.rosters[eventId][idx];
     const isEditing = editPlayer?.side === side && editPlayer?.idx === idx;
     return (
       <>
@@ -200,37 +174,9 @@ export function PreviewEditPanel() {
             />
           ) : (
             <div className="preview-player-value">
-              <div className="preview-player-text">
-                <span className="field-value">
-                  {stripHtml(playerName) || '(空欄)'}
-                </span>
-                {(() => {
-                  const xId = player?.xId ?? '';
-                  const url = xProfileUrl(xId);
-                  return url ? (
-                    <a
-                      className="preview-player-xid"
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {formatXId(xId)}
-                    </a>
-                  ) : (
-                    <div className="preview-player-xid">{formatXId(xId)}</div>
-                  );
-                })()}
-              </div>
-              <div className="preview-player-weapons">
-                {player?.weapons.slice(0, 3).map((weaponId) => (
-                  <img
-                    key={weaponId}
-                    src={weaponImageUrl(weaponId)}
-                    className="preview-weapon-icon"
-                    alt=""
-                  />
-                ))}
-              </div>
+              <span className="field-value">
+                {stripHtml(playerName) || '(空欄)'}
+              </span>
             </div>
           )}
         </td>
@@ -242,53 +188,6 @@ export function PreviewEditPanel() {
             </>
           ) : (
             <button className="btn-sm btn-edit" onClick={() => startPlayerEdit(side, idx, playerName)}>
-              編集
-            </button>
-          )}
-        </td>
-      </>
-    );
-  };
-
-  const renderCommentCells = (side: Side, team: Team | null) => {
-    const labelClass = `preview-row-label${side === 'bravo' ? ' preview-bravo-col' : ''}`;
-    if (!team) {
-      return (
-        <>
-          <th className={labelClass}>意気込み</th>
-          <td />
-          <td className="action-cell" />
-        </>
-      );
-    }
-    const comment = team.comment ?? '';
-    const isEditing = editComment?.side === side;
-    return (
-      <>
-        <th className={labelClass}>意気込み</th>
-        <td>
-          {isEditing ? (
-            <input
-              className="edit-input"
-              value={editComment.value}
-              onChange={(e) => setEditComment({ ...editComment, value: e.target.value })}
-              onKeyDown={handleCommentKeyDown}
-              autoFocus
-            />
-          ) : (
-            <span className="field-value preview-comment-value">
-              {stripHtml(comment) || '(空欄)'}
-            </span>
-          )}
-        </td>
-        <td className="action-cell">
-          {isEditing ? (
-            <>
-              <button className="btn-sm btn-save" onClick={saveCommentEdit}>保存</button>
-              <button className="btn-sm btn-cancel" onClick={cancelCommentEdit}>取消</button>
-            </>
-          ) : (
-            <button className="btn-sm btn-edit" onClick={() => startCommentEdit(side, team)}>
               編集
             </button>
           )}
@@ -309,7 +208,7 @@ export function PreviewEditPanel() {
               <button
                 className="btn-sm btn-win"
                 onClick={() => changeWin(side, -1)}
-                disabled={!team}
+                disabled={!team || wc[side] <= 0}
               >
                 −
               </button>
@@ -317,7 +216,7 @@ export function PreviewEditPanel() {
               <button
                 className="btn-sm btn-win"
                 onClick={() => changeWin(side, 1)}
-                disabled={!team}
+                disabled={!team || wc[side] >= WIN_TARGET}
               >
                 ＋
               </button>
@@ -364,7 +263,7 @@ export function PreviewEditPanel() {
             <td className="preview-spacer-col" />
             {renderViewnameCells('bravo', bravoTeam)}
           </tr>
-          {[0, 1, 2, 3].map((idx) => (
+          {PLAYER_INDEXES.map((idx) => (
             <Fragment key={idx}>
               <tr>
                 {renderPlayerNameCells('alpha', alphaTeam, idx)}
@@ -373,11 +272,6 @@ export function PreviewEditPanel() {
               </tr>
             </Fragment>
           ))}
-          <tr>
-            {renderCommentCells('alpha', alphaTeam)}
-            <td className="preview-spacer-col" />
-            {renderCommentCells('bravo', bravoTeam)}
-          </tr>
           <tr className="preview-win-row">
             {renderWinCountCells('alpha')}
             <td className="preview-spacer-col" />
