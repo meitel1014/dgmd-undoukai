@@ -1,0 +1,95 @@
+/* 対戦表示。座標はレイアウト画像の枠に合わせた仮置き。微調整は手動で行う。
+   フォント「でらすこゴシック」は配信 PC にインストール済みのものを使う（同梱しない）。 */
+
+.battle-container {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  font-family: 'DelaSuko Gothic One', sans-serif;
+  color: #fff;
+}
+
+/* 白文字の縁取り（サンプルに似せた濃い影）。 */
+.battle-player,
+.battle-team-name-box {
+  text-shadow:
+    0 0 4px #222,
+    2px 2px 0 #222,
+    -2px 2px 0 #222,
+    2px -2px 0 #222,
+    -2px -2px 0 #222;
+}
+
+/* ── 選手名（黒バー 4 本: 上端 680 / 752 / 824 / 896px、高さ 66px） ── */
+.battle-player {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  width: 320px;
+  height: 66px;
+  font-size: 48px;
+  line-height: 1;
+}
+
+.battle-player-1 { top: 680px; }
+.battle-player-2 { top: 752px; }
+.battle-player-3 { top: 824px; }
+.battle-player-4 { top: 896px; }
+
+.battle-alpha .battle-player {
+  left: 50px;
+  justify-content: flex-start;
+}
+
+.battle-bravo .battle-player {
+  right: 45px;
+  justify-content: flex-end;
+}
+
+/* FitText のルート div */
+.battle-player-name {
+  width: 100%;
+}
+
+.battle-bravo .battle-player-name {
+  text-align: right;
+}
+
+/* ── チーム名（下段の大きい黒バー: y 980〜1080） ── */
+.battle-team-name-box {
+  position: absolute;
+  top: 980px;
+  display: flex;
+  align-items: center;
+  width: 465px;
+  height: 100px;
+  font-size: 52px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.battle-alpha .battle-team-name-box { left: 75px; }
+.battle-bravo .battle-team-name-box { left: 1380px; }
+
+/* FitText のルート div */
+.battle-team-name {
+  width: 100%;
+}
+
+/* ── 勝利本数（黄 / 青のアクセント部分、中心 y≈1028） ── */
+.battle-win-count {
+  position: absolute;
+  top: 1028px;
+  width: 120px;
+  margin-left: -60px;
+  transform: translateY(-50%);
+  font-size: 80px;
+  line-height: 1;
+  text-align: center;
+  color: #333;
+  font-variant-numeric: tabular-nums;
+}
+
+.battle-alpha .battle-win-count { left: 640px; }
+.battle-bravo .battle-win-count { left: 1280px; }

@@ -68,7 +68,17 @@
     ],
     "graphics": [
       {
-        "file": "battle.html",
+        "file": "battle-area-limited.html",
+        "width": 1920,
+        "height": 1080
+      },
+      {
+        "file": "battle-area-unlimited.html",
+        "width": 1920,
+        "height": 1080
+      },
+      {
+        "file": "battle-turf.html",
         "width": 1920,
         "height": 1080
       }
