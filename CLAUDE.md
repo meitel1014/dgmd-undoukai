@@ -193,7 +193,7 @@ CSV・data/ 仕様: [data/CLAUDE.md](data/CLAUDE.md)
 - **Replicant の初期値**: Zod スキーマの `.default(...)` で定義。Extension では `defaultValue` を渡さない。NodeCG は JSON Schema の default から初期値を作るため、ネストしたオブジェクトの default は省略せず完全な値で書く（`selection` 参照）。
 - **useReplicant は `undefined` を返しうる**: 初回レンダリング時は値が未到達。`?.` や `?? fallback` でガード。
 - **Extension ビルド**: Rollup で **CJS** 出力（NodeCG の require 用）。`rollup-plugin-node-externals` で外部化。
-- **フォント**: Graphic は「でらすこゴシック」（`font-family: 'DelaSuko Gothic One'`）。リポジトリには同梱せず、配信 PC にインストールしたものを使う。
+- **フォント**: Graphic は「でらすこゴシック」。リポジトリには同梱せず、配信 PC にインストールしたものを使う。ファミリー名では Windows の Chrome / OBS が解決できないため、`@font-face` の `local()`（フルネーム / PostScript 名）で読み込む（`_shared/battle.css`）。
 - **ESLint**: `useReplicant` の `rep.value = newValue` は `react-hooks/immutability` の suppress 対象（NodeCG API の正規の書き方）。
 
 ## `.claude/` ディレクトリについて

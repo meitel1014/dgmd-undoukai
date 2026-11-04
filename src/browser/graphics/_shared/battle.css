@@ -1,24 +1,21 @@
 /* 対戦表示。座標はレイアウト画像の枠に合わせた仮置き。微調整は手動で行う。
    フォント「でらすこゴシック」は配信 PC にインストール済みのものを使う（同梱しない）。 */
 
+/* でらすこゴシックはサブファミリー名が "R" のため、Windows の Chrome / OBS では
+   font-family: 'DelaSuko Gothic One'（ファミリー名）で解決できない。
+   local() でフルネーム / PostScript 名を指定すると解決できるので、別名を付けて使う。 */
+@font-face {
+  font-family: 'DelaSukoGothic';
+  src: local('DelaSuko Gothic One Regular'), local('DelaSukoGothicOne-R');
+}
+
 .battle-container {
   position: relative;
   width: 1920px;
   height: 1080px;
   overflow: hidden;
-  font-family: 'DelaSuko Gothic One', sans-serif;
+  font-family: 'DelaSukoGothic', sans-serif;
   color: #fff;
-}
-
-/* 白文字の縁取り（サンプルに似せた濃い影）。 */
-.battle-player,
-.battle-team-name-box {
-  text-shadow:
-    0 0 4px #222,
-    2px 2px 0 #222,
-    -2px 2px 0 #222,
-    2px -2px 0 #222,
-    -2px -2px 0 #222;
 }
 
 /* ── 選手名（黒バー 4 本: 上端 680 / 752 / 824 / 896px、高さ 66px） ── */

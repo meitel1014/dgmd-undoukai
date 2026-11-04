@@ -17,8 +17,8 @@
 | 勝利本数（左右） | 黄 / 青アクセント部分（中心 x 640 / 1280、y 1028）、`#333` | `winCount`（全種目共有） |
 
 - `selection[eventId]` からチームを取得（`_shared/useTeamData.ts` の `useTeamData(eventId, side)`）。未選択の側は何も描かない。
-- フォントは「でらすこゴシック」（`font-family: 'DelaSuko Gothic One'`）。リポジトリには同梱せず、配信 PC にインストールしたものを使う。
-- 白文字はサンプルに似せた濃い縁取り（`text-shadow`）付き。座標・見た目の微調整は手動で行う。
+- フォントは「でらすこゴシック」。リポジトリには同梱せず、配信 PC にインストールしたものを使う。サブファミリー名が "R" のため Windows の Chrome / OBS ではファミリー名（`'DelaSuko Gothic One'`）で解決できない。`@font-face` の `local('DelaSuko Gothic One Regular'), local('DelaSukoGothicOne-R')` で `'DelaSukoGothic'` という別名を付けて使う。
+- 文字は白一色で縁取り無し。座標・見た目の微調整は手動で行う。
 
 ## 実装パターン
 
