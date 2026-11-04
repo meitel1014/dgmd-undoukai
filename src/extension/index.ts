@@ -1,8 +1,9 @@
 import type { NodeCG } from './nodecg';
 import { loadTeamsPoolFromCsv, parseTeamsPoolFromCsvText } from './loadTeams';
 import { loadTeamsFromSheets } from './loadTeamsFromSheets';
-import { applyResult, changedSides, remapSelection, selectionNames } from './matchState';
-import type { Team, TeamsPool } from '../schemas';
+import { applyResult, changedSides, selectionNames } from './matchState';
+import { createTeamsPoolReplacer } from './teamsPoolReplacer';
+import type { Team } from '../schemas';
 
 export default (nodecg: NodeCG) => {
   const log = new nodecg.Logger('ikaterrace');
@@ -29,14 +30,13 @@ export default (nodecg: NodeCG) => {
   });
 
   // teamsPool を丸ごと置き換え、各種目の選択をチーム名で新しい ID に付け替える。
-  // teamsPool を先に置き換えるので、selection の change ハンドラは新しいプールで名前を解決する。
-  const replaceTeamsPool = (next: TeamsPool) => {
-    const oldPool = teamsPoolRep.value ?? [];
-    teamsPoolRep.value = next;
-    if (selectionRep.value) {
-      selectionRep.value = remapSelection(selectionRep.value, oldPool, next);
-    }
-  };
+  // チームが 0 件なら置き換えずに false を返す。
+  const replaceTeamsPool = createTeamsPoolReplacer({
+    getPool: () => teamsPoolRep.value,
+    setPool: (pool) => { teamsPoolRep.value = pool; },
+    getSelection: () => selectionRep.value,
+    setSelection: (sel) => { selectionRep.value = sel; },
+  });
 
   // 初回起動時のみ teamsPool を初期化。Googleスプレッドシートを優先し、
   // 読み込めない場合（未設定・認証失敗等）は data/teams.csv にフォールバックする。
@@ -99,7 +99,11 @@ export default (nodecg: NodeCG) => {
         return;
       }
 
-      replaceTeamsPool(loaded);
+      if (!replaceTeamsPool(loaded)) {
+        log.warn('[upload-teams-csv] チームが 0 件のため teamsPool は変更しません');
+        res.status(400).json({ error: 'no teams in CSV' });
+        return;
+      }
       log.info(`[upload-teams-csv] ${loaded.length} 件`);
       res.status(200).json({ teams: loaded.length });
     });
@@ -136,7 +140,11 @@ export default (nodecg: NodeCG) => {
 
   nodecg.listenFor('reloadTeamsCsv', (_data, ack) => {
     const loaded = loadTeamsPoolFromCsv();
-    replaceTeamsPool(loaded);
+    if (!replaceTeamsPool(loaded)) {
+      log.warn('reloadTeamsCsv: data/teams.csv からチームを読めませんでした（teamsPoolは変更なし）');
+      if (ack && !ack.handled) ack('data/teams.csv からチームを読めませんでした');
+      return;
+    }
     log.info(`Reloaded teams from CSV: ${loaded.length}`);
     if (ack && !ack.handled) ack(null);
   });
