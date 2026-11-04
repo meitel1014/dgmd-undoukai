@@ -4,11 +4,9 @@
 
 | Graphic | 用途 |
 |---|---|
-| `battle-area-limited` | エリア制限の対戦表示 |
-| `battle-area-unlimited` | エリア無制限の対戦表示 |
-| `battle-turf` | ナワバリの対戦表示 |
+| `battle` | 対戦表示（`currentEvent` の種目の対戦カード） |
 
-中身はすべて `_shared/BattleGraphic.tsx` に `eventId` を渡すだけの薄いエントリ。
+中身は `_shared/BattleGraphic.tsx` をマウントするだけの薄いエントリ。`BattleGraphic` が `currentEvent` を読み、その種目で描画する。
 
 ## BattleGraphic の表示要素（座標は `_shared/battle.css`）
 

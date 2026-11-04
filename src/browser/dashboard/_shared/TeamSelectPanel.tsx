@@ -2,13 +2,14 @@ import './TeamSelectPanel.css';
 import { useReplicant } from '../../hooks/useReplicant';
 import { stripHtml } from '../../utils/stripHtml';
 import type { Side } from '@/nodecg/messages';
-import type { EventId } from '@/schemas';
+import { EVENT_DISPLAY_NAMES } from '@/schemas';
 
-export function TeamSelectPanel({ eventId }: { eventId: EventId }) {
+export function TeamSelectPanel() {
   const [teamsPool] = useReplicant('teamsPool');
   const [selection, setSelection] = useReplicant('selection');
+  const [eventId] = useReplicant('currentEvent');
 
-  if (!teamsPool || !selection) return <p>読み込み中…</p>;
+  if (!teamsPool || !selection || !eventId) return <p>読み込み中…</p>;
 
   const current = selection[eventId];
 
@@ -21,6 +22,7 @@ export function TeamSelectPanel({ eventId }: { eventId: EventId }) {
 
   return (
     <div className="team-select-panel">
+      <p className="team-select-event">種目: {EVENT_DISPLAY_NAMES[eventId]}</p>
       <div className="field field-alpha">
         <label>アルファチーム</label>
         <select

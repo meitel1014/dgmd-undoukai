@@ -21,16 +21,16 @@ type EditPlayerTarget = {
 const PLAYER_LABELS = ['プレイヤー1', 'プレイヤー2', 'プレイヤー3', 'プレイヤー4'] as const;
 const PLAYER_INDEXES = [0, 1, 2, 3] as const;
 
-type Props = { eventId: EventId };
-
-export function PreviewEditPanel({ eventId }: Props) {
+export function PreviewEditPanel() {
   const [selection] = useReplicant('selection');
+  const [eventId] = useReplicant('currentEvent');
+  if (!eventId) return <p>読み込み中…</p>;
   const current = selection?.[eventId];
-  // 選択チームが変わったら編集中の状態を破棄する（key で作り直す）
-  return <PreviewEditTable key={`${current?.alpha}-${current?.bravo}`} eventId={eventId} />;
+  // 種目・選択チームが変わったら編集中の状態を破棄する（key で作り直す）
+  return <PreviewEditTable key={`${eventId}-${current?.alpha}-${current?.bravo}`} eventId={eventId} />;
 }
 
-function PreviewEditTable({ eventId }: Props) {
+function PreviewEditTable({ eventId }: { eventId: EventId }) {
   const [teamsPool] = useReplicant('teamsPool');
   const [selection] = useReplicant('selection');
   const [winCount, setWinCount] = useReplicant('winCount');

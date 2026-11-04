@@ -38,14 +38,14 @@ npx nodecg start   # pnpm build 後の本番起動
 
 NodeCG は **Dashboard** / **Graphics** / **Extension** の 3 コンポーネントで構成される。
 
-- **Dashboard** ([src/browser/dashboard/](src/browser/dashboard/)) — 運営用の操作パネル（エリア制限 / エリア無制限 / ナワバリ / 設定 の 4 Workspace）
-- **Graphics** ([src/browser/graphics/](src/browser/graphics/)) — 配信画面に載せるオーバーレイ（battle-area-limited / battle-area-unlimited / battle-turf）
+- **Dashboard** ([src/browser/dashboard/](src/browser/dashboard/)) — 運営用の操作パネル（大運動会 / 設定 の 2 Workspace）
+- **Graphics** ([src/browser/graphics/](src/browser/graphics/)) — 配信画面に載せるオーバーレイ（battle の 1 枚）
 - **Extension** ([src/extension/index.ts](src/extension/index.ts)) — Googleスプレッドシート/CSV ロード、メッセージハンドラ、Replicant 管理
 
 ### 種目
 
 種目 ID は `areaLimited` / `areaUnlimited` / `turf`（[src/schemas/event.ts](src/schemas/event.ts) の `EVENT_IDS`）。
-複数種目を同時に実施することはない。必要勝利数は全種目 2 本先取で固定（`WIN_TARGET`）。
+複数種目を同時に実施することはない。進行中の種目は `currentEvent` Replicant で切り替える（Dashboard の「種目選択」パネル）。必要勝利数は全種目 2 本先取で固定（`WIN_TARGET`）。
 
 ### Replicant（状態同期）
 
@@ -53,7 +53,8 @@ NodeCG は **Dashboard** / **Graphics** / **Extension** の 3 コンポーネン
 |---|---|---|
 | `teamsPool` | `TeamsPool`（`Team[]`） | チーム一覧（全種目共通。Googleスプレッドシート由来。失敗時は CSV にフォールバック。編集で上書き） |
 | `selection` | `Selection` | **種目ごと**のアルファ/ブラボー 選択チーム ID（`selection[eventId].alpha`） |
-| `winCount` | `WinCount` | アルファ/ブラボー 各枠の勝利本数（0〜2）。**全種目で共有**。どの種目でもチームを入れ替えると Extension が該当枠を 0 リセット |
+| `winCount` | `WinCount` | アルファ/ブラボー 各枠の勝利本数（0〜2）。**全種目で共有**。どの種目でもチームを入れ替えると Extension が該当枠を 0 リセット（種目の切り替えではリセットしない） |
+| `currentEvent` | `CurrentEvent`（`EventId`） | 進行中の種目。既定 `areaLimited`。チーム選択・プレビュー編集・battle Graphic が読む |
 
 Replicant は NodeCG の `db/` に自動永続化される。編集内容はプロセス再起動後も保持される。
 
@@ -123,13 +124,14 @@ Replicant は NodeCG の `db/` に自動永続化される。編集内容はプ�
 │   │   ├── components/FitText.tsx   # テキスト自動縮小コンポーネント
 │   │   ├── hooks/useReplicant.ts    # Replicant 購読用 React フック
 │   │   ├── dashboard/
-│   │   │   ├── _shared/             # 共通パネルコンポーネント（eventId を props で受ける）
-│   │   │   ├── {area-limited,area-unlimited,turf}-team-select/  # 種目別: チーム選択
-│   │   │   ├── {area-limited,area-unlimited,turf}-preview/      # 種目別: プレビュー編集
+│   │   │   ├── _shared/             # 共通パネルコンポーネント（currentEvent を読む）
+│   │   │   ├── battle-event-select/ # 種目選択
+│   │   │   ├── battle-team-select/  # チーム選択（選択中の種目）
+│   │   │   ├── battle-preview/      # プレビュー編集（選択中の種目）
 │   │   │   └── settings-csv-reload/ # チーム情報再読込パネル
 │   │   └── graphics/
-│   │       ├── _shared/             # BattleGraphic（eventId を props で受ける）+ CSS
-│   │       └── battle-{area-limited,area-unlimited,turf}/  # 種目別の対戦表示
+│   │       ├── _shared/             # BattleGraphic（currentEvent を読む）+ CSS
+│   │       └── battle/              # 対戦表示
 │   ├── extension/
 │   │   ├── index.ts             # Extension エントリポイント・HTTP エンドポイント定義
 │   │   ├── nodecg.d.ts          # Extension 側 `nodecg` グローバル型宣言
@@ -174,7 +176,7 @@ CSV・data/ 仕様: [data/CLAUDE.md](data/CLAUDE.md)
 ### チーム表示フロー
 1. 運営が `data/sheets.json` に出場者スプレッドシートURLを記載、`data/credentials/` にサービスアカウント鍵JSONを配置（共有設定も必要、[data/CLAUDE.md](data/CLAUDE.md) 参照）
 2. Extension 起動時にスプレッドシートを読み、`teamsPool` Replicant を初期化（永続値があればスキップ）。読み込み失敗時は `data/teams.csv` にフォールバック
-3. 種目の Workspace でチーム選択 → `selection[eventId]` 更新（その種目の Graphic に即時反映・常時表示）
+3. 種目選択 → `currentEvent` 更新。チーム選択 → `selection[currentEvent]` 更新（battle Graphic に即時反映・常時表示）
 4. プレビュー編集 → `updateTeam` メッセージ → `teamsPool` 内のチームを部分更新
 5. 設定で「スプレッドシートから再読込」/「CSV 再読込」/ CSV アップロード → `replaceTeamsPool()` で上書きし、選択をチーム名で付け替え
 

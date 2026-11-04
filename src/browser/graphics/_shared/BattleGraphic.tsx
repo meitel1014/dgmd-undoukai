@@ -5,10 +5,8 @@ import { useTeamData } from './useTeamData';
 import type { Side } from '@/nodecg/messages';
 import type { EventId } from '@/schemas';
 
-type Props = { eventId: EventId };
-
 /** 1 サイドぶん（選手名 4 人 + チーム名 + 勝利本数）。未選択なら何も描かない。 */
-function TeamSide({ eventId, side }: Props & { side: Side }) {
+function TeamSide({ eventId, side }: { eventId: EventId; side: Side }) {
   const { team } = useTeamData(eventId, side);
   const [winCount] = useReplicant('winCount');
   if (!team) return null;
@@ -31,10 +29,13 @@ function TeamSide({ eventId, side }: Props & { side: Side }) {
 }
 
 /**
- * 対戦表示（1920×1080、透過背景）。
+ * 対戦表示（1920×1080、透過背景）。currentEvent の種目の対戦カードを表示する。
  * 枠・ロゴのレイアウト画像は OBS の下レイヤーに敷き、ここでは文字だけを重ねる。
  */
-export function BattleGraphic({ eventId }: Props) {
+export function BattleGraphic() {
+  const [eventId] = useReplicant('currentEvent');
+  if (!eventId) return null;
+
   return (
     <div className="battle-container">
       <TeamSide eventId={eventId} side="alpha" />

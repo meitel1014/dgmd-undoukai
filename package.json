@@ -17,45 +17,24 @@
     "compatibleRange": "^2.0.0",
     "dashboardPanels": [
       {
-        "name": "area-limited-team-select",
-        "title": "エリア制限｜チーム選択",
-        "file": "area-limited-team-select.html",
-        "workspace": "エリア制限",
+        "name": "battle-event-select",
+        "title": "種目選択",
+        "file": "battle-event-select.html",
+        "workspace": "大運動会",
         "width": 4
       },
       {
-        "name": "area-limited-preview",
-        "title": "エリア制限｜プレビュー編集",
-        "file": "area-limited-preview.html",
-        "workspace": "エリア制限",
-        "width": 8
-      },
-      {
-        "name": "area-unlimited-team-select",
-        "title": "エリア無制限｜チーム選択",
-        "file": "area-unlimited-team-select.html",
-        "workspace": "エリア無制限",
+        "name": "battle-team-select",
+        "title": "チーム選択",
+        "file": "battle-team-select.html",
+        "workspace": "大運動会",
         "width": 4
       },
       {
-        "name": "area-unlimited-preview",
-        "title": "エリア無制限｜プレビュー編集",
-        "file": "area-unlimited-preview.html",
-        "workspace": "エリア無制限",
-        "width": 8
-      },
-      {
-        "name": "turf-team-select",
-        "title": "ナワバリ｜チーム選択",
-        "file": "turf-team-select.html",
-        "workspace": "ナワバリ",
-        "width": 4
-      },
-      {
-        "name": "turf-preview",
-        "title": "ナワバリ｜プレビュー編集",
-        "file": "turf-preview.html",
-        "workspace": "ナワバリ",
+        "name": "battle-preview",
+        "title": "プレビュー編集",
+        "file": "battle-preview.html",
+        "workspace": "大運動会",
         "width": 8
       },
       {
@@ -68,17 +47,7 @@
     ],
     "graphics": [
       {
-        "file": "battle-area-limited.html",
-        "width": 1920,
-        "height": 1080
-      },
-      {
-        "file": "battle-area-unlimited.html",
-        "width": 1920,
-        "height": 1080
-      },
-      {
-        "file": "battle-turf.html",
+        "file": "battle.html",
         "width": 1920,
         "height": 1080
       }
