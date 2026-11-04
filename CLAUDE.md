@@ -2,8 +2,10 @@
 
 ## プロジェクト概要
 
-スプラトゥーン 3 を用いたトーナメント大会の配信グラフィックシステム。
-チーム情報を Dashboard から操作し、配信画面と会場スクリーンにオーバーレイ表示する。
+「デジ窓大運動会」（4 チーム対抗の複数ゲーム大会）のうち、スプラトゥーン 3 の 3 種目
+（エリア制限 / エリア無制限 / ナワバリ）の配信グラフィックシステム。
+チーム情報を Dashboard から操作し、配信画面にオーバーレイ表示する。スプラ以外の種目・サーモンランは対象外。
+設計: [docs/superpowers/specs/2026-11-05-undoukai-splatoon-design.md](docs/superpowers/specs/2026-11-05-undoukai-splatoon-design.md)
 
 バンドル名: `ika-terrace-node`（[package.json](package.json) の `name` と [bundleName.ts](bundleName.ts) の `BUNDLE_NAME` で定義。一致必須）
 
@@ -23,6 +25,7 @@ pnpm install       # 依存インストール
 pnpm dev           # Vite と NodeCG を並列起動（HMR あり）
 pnpm build         # tsc -b → vite build（型チェック → プロダクションビルド）
 pnpm lint          # ESLint（flat config）
+pnpm test          # vitest（Extension の純粋関数のみ）
 npx nodecg start   # pnpm build 後の本番起動
 ```
 
@@ -35,21 +38,22 @@ npx nodecg start   # pnpm build 後の本番起動
 
 NodeCG は **Dashboard** / **Graphics** / **Extension** の 3 コンポーネントで構成される。
 
-- **Dashboard** ([src/browser/dashboard/](src/browser/dashboard/)) — 運営用の操作パネル（Battle / 設定 / caster の 3 Workspace）
-- **Graphics** ([src/browser/graphics/](src/browser/graphics/)) — 配信画面に載せるオーバーレイ（battle / cast / cast-replay / champion / team-roster-alpha / team-roster-bravo）
+- **Dashboard** ([src/browser/dashboard/](src/browser/dashboard/)) — 運営用の操作パネル（エリア制限 / エリア無制限 / ナワバリ / 設定 の 4 Workspace）
+- **Graphics** ([src/browser/graphics/](src/browser/graphics/)) — 配信画面に載せるオーバーレイ（battle-area-limited / battle-area-unlimited / battle-turf）
 - **Extension** ([src/extension/index.ts](src/extension/index.ts)) — Googleスプレッドシート/CSV ロード、メッセージハンドラ、Replicant 管理
+
+### 種目
+
+種目 ID は `areaLimited` / `areaUnlimited` / `turf`（[src/schemas/event.ts](src/schemas/event.ts) の `EVENT_IDS`）。
+複数種目を同時に実施することはない。必要勝利数は全種目 2 本先取で固定（`WIN_TARGET`）。
 
 ### Replicant（状態同期）
 
 | Replicant名 | 型 | 用途 |
 |---|---|---|
-| `teamsPool` | `TeamsPool`（`Team[]`） | チーム一覧（Googleスプレッドシート由来。失敗時は CSV にフォールバック。編集で上書き） |
-| `selection` | `Selection` | アルファ/ブラボー 選択チーム ID |
-| `winCount` | `WinCount` | アルファ/ブラボー 各枠の勝利本数（side ベース。チーム選択を入れ替えると Extension が該当枠を 0 リセット） |
-| `winTarget` | `WinTarget` | 決勝の必要勝利数（先取本数）。`1`=BO1 / `2`=BO3 / `3`=BO5、既定 `2` |
-| `champion` | `Champion` | 優勝確定サイド（`null` は未確定）。Extension が `winCount`/`winTarget` から**一元導出**して書き込む派生状態。Dashboard/Graphic は書かない |
-| `castCandidates` | `CastCandidates` | 実況・解説（`cast`）/オペレーター/オブザーバの候補リスト（`data/cast.json` から常に初期化） |
-| `castMembers` | `CastMembers` | 現在選択中の実況・解説・オペレーター・オブザーバ |
+| `teamsPool` | `TeamsPool`（`Team[]`） | チーム一覧（全種目共通。Googleスプレッドシート由来。失敗時は CSV にフォールバック。編集で上書き） |
+| `selection` | `Selection` | **種目ごと**のアルファ/ブラボー 選択チーム ID（`selection[eventId].alpha`） |
+| `winCount` | `WinCount` | アルファ/ブラボー 各枠の勝利本数（0〜2）。**全種目で共有**。どの種目でもチームを入れ替えると Extension が該当枠を 0 リセット |
 
 Replicant は NodeCG の `db/` に自動永続化される。編集内容はプロセス再起動後も保持される。
 
@@ -59,9 +63,9 @@ Replicant は NodeCG の `db/` に自動永続化される。編集内容はプ�
 |---|---|---|
 | `reloadTeamsFromSheets` | なし | Googleスプレッドシートから `teamsPool` 再読込。失敗時は `teamsPool` を変更しない |
 | `reloadTeamsCsv` | なし | CSV 再読込（編集内容破棄、フォールバック経路） |
-| `updateTeam` | `{ teamId, patch }` | チーム情報の部分更新（`patch.players` はプレイヤー単位の部分更新） |
-| `reloadCastJson` | なし | `data/cast.json` 再読込（`castCandidates` を上書き） |
-| `setCastMembers` | `CastMembers` | 実況・解説等の担当者選択を更新 |
+| `updateTeam` | `{ teamId, patch: { viewname?, player?: { eventId, index, name } } }` | チーム表示名（全種目共通）または指定種目の選手名 1 人を更新 |
+
+`teamsPool` を丸ごと置き換える処理（再読込・アップロード）は Extension の `replaceTeamsPool()` を通し、各種目の選択をチーム名（`name`）で新しい ID に付け替える（[src/extension/matchState.ts](src/extension/matchState.ts)）。
 
 ### 型安全ブリッジ
 
@@ -69,6 +73,7 @@ Replicant は NodeCG の `db/` に自動永続化される。編集内容はプ�
 
 - [src/nodecg/replicants.d.ts](src/nodecg/replicants.d.ts) — `ReplicantMap`
 - [src/nodecg/messages.d.ts](src/nodecg/messages.d.ts) — `MessageMap`（`Side` 型もここで定義）
+- [src/schemas/event.ts](src/schemas/event.ts) — 種目 ID・ラベル・`WIN_TARGET`（Replicant ではないので `*Schema` は持たない）
 
 追加作業の順序は **Zod スキーマ → マップ登録 → 実装** にすると、ビルドエラーで抜けを検出しやすい。
 
@@ -80,21 +85,18 @@ Replicant は NodeCG の `db/` に自動永続化される。編集内容はプ�
 
 ### 生 HTML の扱い（D案）
 
-チーム名には `<br>` 等の HTML タグを含めることができる（CSV に直接書く）。
-レンダリングは [src/browser/components/Html.tsx](src/browser/components/Html.tsx) コンポーネント経由のみ。
-`dangerouslySetInnerHTML` の直書きは禁止し、`<Html>` コンポーネントに閉じ込めている。
+チーム表示名（`viewname`）には `<br>` 等の HTML タグを含めることができる（Dashboard で編集）。
+レンダリングは [src/browser/components/Html.tsx](src/browser/components/Html.tsx) または `FitText` 経由のみ。
+`dangerouslySetInnerHTML` の直書きは禁止し、コンポーネントに閉じ込めている。
 
 ### Team フィールドの使い分け
 
 | フィールド | 用途 |
 |---|---|
-| `team.id` | 読み込み時に割り振る**連番文字列**（"1","2","3"...）。Replicant 内の検索キー。変更不可。 |
-| `team.name` | チーム名原本。編集禁止。**Graphic 以外**（Dashboard 表示）で使う。 |
-| `team.viewname` | 表示用チーム名。`<br>` 等の HTML タグを含む場合がある。Dashboard から自由編集可。**Graphic でのみ使う**。 |
-| `team.comment` | 意気込み。申請フォームの「意気込み」/「コメント」を含む列由来。`<br>` 等の HTML タグを含む場合がある。Dashboard から自由編集可。`team-roster-*` Graphic でメンバー一覧の下に表示。 |
-| `team.players[].name` | プレイヤー名。Dashboard から編集可。 |
-| `team.players[].xId` | X(Twitter) ID の生値（`@`の有無は問わない）。CSV由来の場合は空文字。表示側で`@`を正規化して付与する。 |
-| `team.players[].weapons` | 持ちブキ（`data/weapon_aliases.csv` の `id` 列）の配列。CSV由来の場合は空配列。表示は先頭から最大3件。 |
+| `team.id` | 読み込み時に主将の並び順で割り振る**連番文字列**（"1","2","3"...）。Replicant 内の検索キー。変更不可。 |
+| `team.name` | チーム名原本（`{主将名}チーム`）。編集禁止。**Graphic 以外**（Dashboard 表示）で使う。再読込時の選択付け替えのキーにもなる。 |
+| `team.viewname` | 表示用チーム名（全種目共通）。`<br>` 等の HTML タグを含む場合がある。Dashboard から自由編集可。**Graphic でのみ使う**。 |
+| `team.rosters[eventId]` | 種目ごとの選手名 4 人。Dashboard から編集可。 |
 
 読み込み直後は `viewname === name`。Graphic 以外で `team.viewname` を参照していたら `team.name` に修正すること。
 
@@ -104,59 +106,44 @@ Replicant は NodeCG の `db/` に自動永続化される。編集内容はプ�
 .
 ├── bundleName.ts                    # BUNDLE_NAME（package.json の name と一致必須）
 ├── vite.config.mts                  # Vite 設定
+├── vitest.config.mts                # vitest 設定（NodeCG ビルドプラグインを読まない）
 ├── vite-plugin-nodecg.mts           # dashboard/graphics の HTML 生成 + extension の Rollup ビルド
 ├── vite-plugin-nodecg-schemas.mts   # Zod → JSON Schema 生成
 ├── data/
-│   ├── teams.csv                    # チーム情報原本（UTF-8 BOMなし、フォールバック用）
-│   ├── cast.json                    # 実況・解説担当者候補リスト
-│   ├── sheets.json                  # Googleスプレッドシート参照URL設定
-│   ├── credentials/                 # GCPサービスアカウント鍵JSON配置先（中身読み取り禁止）
-│   ├── weapon_aliases.csv           # 武器名(ja) ↔ 画像ファイル名(id) 対応表
-│   ├── weapon_flat_10_0_0/          # 武器アイコン画像（/weapon-images/{id}.png で配信）
-│   └── cast_icon/                   # キャストアイコン画像（{キャスト名}.{拡張子}、/cast-icons/{名} で配信）
+│   ├── teams.csv                    # 出場者シートの CSV エクスポート（フォールバック用）
+│   ├── sheets.json                  # 出場者スプレッドシートの URL 設定
+│   └── credentials/                 # GCPサービスアカウント鍵JSON配置先（中身読み取り禁止）
+├── docs/superpowers/                # 設計書・実装計画
 ├── src/
 │   ├── template.html                # 全 HTML の共通テンプレート
 │   ├── browser/
 │   │   ├── global.css               # リセット CSS
 │   │   ├── global.d.ts              # ブラウザ側 `nodecg` グローバル型宣言
 │   │   ├── components/Html.tsx      # 生 HTML レンダリング専用（dangerouslySetInnerHTML を隠蔽）
-│   │   ├── components/FitText.tsx   # テキスト自動縮小コンポーネント（battle graphic で使用）
-│   │   ├── hooks/
-│   │   │   └── useReplicant.ts      # Replicant 購読用 React フック
+│   │   ├── components/FitText.tsx   # テキスト自動縮小コンポーネント
+│   │   ├── hooks/useReplicant.ts    # Replicant 購読用 React フック
 │   │   ├── dashboard/
-│   │   │   ├── _shared/             # 共通パネルコンポーネント
-│   │   │   ├── battle-team-select/  # Battle Workspace: チーム選択
-│   │   │   ├── battle-preview/      # Battle Workspace: プレビュー編集
-│   │   │   ├── cast-control/        # caster Workspace: 実況・解説担当者選択
-│   │   │   ├── settings-win-target/ # 設定 Workspace: 必要勝利数(BO1/BO3/BO5)選択
-│   │   │   ├── settings-csv-reload/ # CSV 再読込パネル
-│   │   │   └── settings-cast-upload/ # 担当者リスト読込パネル
+│   │   │   ├── _shared/             # 共通パネルコンポーネント（eventId を props で受ける）
+│   │   │   ├── {area-limited,area-unlimited,turf}-team-select/  # 種目別: チーム選択
+│   │   │   ├── {area-limited,area-unlimited,turf}-preview/      # 種目別: プレビュー編集
+│   │   │   └── settings-csv-reload/ # チーム情報再読込パネル
 │   │   └── graphics/
-│   │       ├── _shared/             # graphics 共通コンポーネント + CSS
-│   │       ├── battle/              # 対戦表示用（勝利本数も表示）
-│   │       ├── cast/                # 実況・解説担当者表示（メインレイアウト）
-│   │       ├── cast-replay/         # 実況・解説担当者表示（リプレイレイアウト）
-│   │       ├── champion/            # 優勝演出（champion Replicant を読むだけ）
-│   │       ├── team-roster-alpha/   # 選手ロスター表示（アルファ用、独立ページ）
-│   │       └── team-roster-bravo/   # 選手ロスター表示（ブラボー用、独立ページ）
+│   │       ├── _shared/             # BattleGraphic（eventId を props で受ける）+ CSS
+│   │       └── battle-{area-limited,area-unlimited,turf}/  # 種目別の対戦表示
 │   ├── extension/
 │   │   ├── index.ts             # Extension エントリポイント・HTTP エンドポイント定義
 │   │   ├── nodecg.d.ts          # Extension 側 `nodecg` グローバル型宣言
 │   │   ├── csv.ts               # RFC4180 パーサ
-│   │   ├── loadTeams.ts         # CSV → TeamsPool 変換（フォールバック）
-│   │   ├── loadTeamsFromSheets.ts # Googleスプレッドシート → TeamsPool 変換
+│   │   ├── parseTeamsGrid.ts    # 出場者シート（表形式）→ TeamsPool 変換（シート・CSV 共通）
+│   │   ├── matchState.ts        # 勝利数加算・選択の付け替え等の純粋関数
+│   │   ├── loadTeams.ts         # CSV → TeamsPool（フォールバック）
+│   │   ├── loadTeamsFromSheets.ts # Googleスプレッドシート → TeamsPool
 │   │   ├── sheetsConfig.ts      # data/sheets.json 読み込み
-│   │   ├── googleSheetsClient.ts # サービスアカウント認証 + GoogleSpreadsheet取得
-│   │   ├── weaponAliases.ts     # weapon_aliases.csv 読み込み・武器名解決
-│   │   ├── serveWeaponImages.ts # 武器画像配信ミドルウェア
-│   │   ├── serveCastIcons.ts   # キャストアイコン配信ミドルウェア
-│   │   └── loadCastCandidates.ts # cast.json → CastCandidates 変換
+│   │   └── googleSheetsClient.ts # サービスアカウント認証 + GoogleSpreadsheet取得
 │   ├── nodecg/
 │   │   ├── replicants.d.ts          # ReplicantMap
 │   │   └── messages.d.ts            # MessageMap + Side 型
 │   └── schemas/                     # Zod スキーマ定義（index.ts で全スキーマを re-export）
-├── scripts/
-│   └── export-images.mjs            # 画像エクスポートスクリプト
 └── cfg/                             # NodeCG 設定（.gitignore 対象）
 ```
 
@@ -185,32 +172,26 @@ CSV・data/ 仕様: [data/CLAUDE.md](data/CLAUDE.md)
 ## データフロー
 
 ### チーム表示フロー
-1. 運営が `data/sheets.json` に申請フォーム/選手情報登録フォームのスプレッドシートURLを記載、`data/credentials/` にサービスアカウント鍵JSONを配置（共有設定も必要、[data/CLAUDE.md](data/CLAUDE.md) 参照）
+1. 運営が `data/sheets.json` に出場者スプレッドシートURLを記載、`data/credentials/` にサービスアカウント鍵JSONを配置（共有設定も必要、[data/CLAUDE.md](data/CLAUDE.md) 参照）
 2. Extension 起動時にスプレッドシートを読み、`teamsPool` Replicant を初期化（永続値があればスキップ）。読み込み失敗時は `data/teams.csv` にフォールバック
-3. Dashboard でチーム選択 → `selection` Replicant 更新（選択されたチームは Graphic に即時反映・常時表示）
-4. Dashboard のプレビュー編集 → `updateTeam` メッセージ → `teamsPool` 内のチームを部分更新
-5. 設定で「スプレッドシートから再読込」→ `reloadTeamsFromSheets` メッセージ → 成功時のみ `teamsPool` を上書き（失敗時は変更しない）
-6. 設定で「チーム情報CSV再読込」→ `reloadTeamsCsv` メッセージ → CSV から `teamsPool` を強制上書き（編集破棄、フォールバック経路）
+3. 種目の Workspace でチーム選択 → `selection[eventId]` 更新（その種目の Graphic に即時反映・常時表示）
+4. プレビュー編集 → `updateTeam` メッセージ → `teamsPool` 内のチームを部分更新
+5. 設定で「スプレッドシートから再読込」/「CSV 再読込」/ CSV アップロード → `replaceTeamsPool()` で上書きし、選択をチーム名で付け替え
 
-### 勝利数・優勝フロー
-1. 設定の「必要勝利数」パネル（`settings-win-target`）で BO1/BO3/BO5 を選択 → `winTarget` Replicant 更新
-2. OBS 等から `POST /result`（`alpha_win` / `bravo_win` / `reset`）→ Extension が `winCount` を加算/リセット（`battle` graphic に即時反映）
-3. チーム選択（`selection`）を入れ替えると Extension が該当枠の `winCount` を 0 リセット
-4. Extension の `recomputeChampion()` が `winCount`/`winTarget` の change を購読し、必要数に達したサイドを `champion` に導出（同時到達は alpha 優先、先着を維持、必要数を下回れば解除）
-5. `champion` graphic は `champion` Replicant を読むだけのステートレス描画で優勝演出を表示
+### 勝利数フロー
+1. OBS 等から `POST /result`（`alpha_win` / `bravo_win` / `reset`）、または Dashboard の ＋/−/リセット → `winCount` を更新（0〜2、全種目共有）
+2. いずれかの種目で選択チーム（チーム名で比較）が変わると、Extension が該当枠の `winCount` を 0 リセット
 
 ## 重要な挙動メモ
 
 - **Googleスプレッドシート連携**: 認証はGCPサービスアカウント（鍵は `data/credentials/` 配下の最初の `.json` を自動検出、中身は読み取り禁止）。詳細仕様は [data/CLAUDE.md](data/CLAUDE.md) 参照。
-- **武器画像配信**: `GET /bundles/ika-terrace-node/weapon-images/{id}.png`（`serveWeaponImages.ts`、パストラバーサル対策済み）。
-- **キャストアイコン配信**: `GET /bundles/ika-terrace-node/cast-icons/{キャスト名}`（`serveCastIcons.ts`）。ファイル名が日本語かつ拡張子不定のため、拡張子を除いた basename 一致でディレクトリを走査して配信する。
-- **勝利数エンドポイント**: `POST /result`（body: `{ "result": "alpha_win" | "bravo_win" | "reset" }`）で `winCount` を操作。OBS 等の外部トリガー用。詳細は [README.md](README.md)。
-- **CSV アップロード**: `POST /upload-teams-csv`（body: UTF-8 テキスト）でファイルアップロード後に `teamsPool` を再初期化。`settings-csv-reload` パネルから利用可能。
-- **担当者リストアップロード**: `POST /upload-cast-json`（body: UTF-8 JSON）で `castCandidates` を再初期化。`settings-cast-upload` パネルから利用可能。
-- **Replicant 永続化**: NodeCG の `db/` 配下に JSON で自動保存される。編集内容はプロセス再起動後も残る。初回起動時のみスプレッドシート/CSV から初期化。
-- **Replicant の初期値**: Zod スキーマの `.default(...)` で定義。Extension では `defaultValue` を渡さない。
+- **勝利数エンドポイント**: `POST /result`（body: `{ "result": "alpha_win" | "bravo_win" | "reset" }`）。`nodecg.mount()` はバンドル名プレフィックスを付けないため URL は `http://127.0.0.1:9090/result`。詳細は [README.md](README.md)。
+- **CSV アップロード**: `POST /upload-teams-csv`（body: UTF-8 テキスト）で `teamsPool` を再初期化。`settings-csv-reload` パネルから利用可能。
+- **Replicant 永続化**: NodeCG の `db/` 配下に自動保存される。編集内容はプロセス再起動後も残る。初回起動時のみスプレッドシート/CSV から初期化。旧（いかてらす版）の `db/` とは互換性が無いので削除してから起動する。
+- **Replicant の初期値**: Zod スキーマの `.default(...)` で定義。Extension では `defaultValue` を渡さない。NodeCG は JSON Schema の default から初期値を作るため、ネストしたオブジェクトの default は省略せず完全な値で書く（`selection` 参照）。
 - **useReplicant は `undefined` を返しうる**: 初回レンダリング時は値が未到達。`?.` や `?? fallback` でガード。
 - **Extension ビルド**: Rollup で **CJS** 出力（NodeCG の require 用）。`rollup-plugin-node-externals` で外部化。
+- **フォント**: Graphic は「でらすこゴシック」（`font-family: 'DelaSuko Gothic One'`）。リポジトリには同梱せず、配信 PC にインストールしたものを使う。
 - **ESLint**: `useReplicant` の `rep.value = newValue` は `react-hooks/immutability` の suppress 対象（NodeCG API の正規の書き方）。
 
 ## `.claude/` ディレクトリについて

@@ -1,23 +1,28 @@
 # Graphic 仕様
 
-全 Graphic は 1920×1080。
+全 Graphic は 1920×1080、**背景は透過**。枠・ロゴのレイアウト画像は OBS の下レイヤーに敷き、Graphic は文字だけを重ねる。
 
-| Graphic | 用途 | 表示領域 |
+| Graphic | 用途 |
+|---|---|
+| `battle-area-limited` | エリア制限の対戦表示 |
+| `battle-area-unlimited` | エリア無制限の対戦表示 |
+| `battle-turf` | ナワバリの対戦表示 |
+
+中身はすべて `_shared/BattleGraphic.tsx` に `eventId` を渡すだけの薄いエントリ。
+
+## BattleGraphic の表示要素（座標は `_shared/battle.css`）
+
+| 要素 | 位置 | 内容 |
 |---|---|---|
-| `battle` | 対戦表示用 | 左上: チーム名2段（FitText 自動縮小）+ 勝利本数 / 左下: αプレイヤー4名 / 右下: βプレイヤー4名 |
-| `cast` | 実況・解説担当者表示（メインレイアウト） | 担当者名 + キャストアイコン |
-| `cast-replay` | 実況・解説担当者表示（リプレイレイアウト） | 担当者名 + キャストアイコン |
-| `champion` | 優勝演出 | 優勝確定チームのチーム名 + プレイヤー4名 |
-| `team-roster-alpha` / `team-roster-bravo` | 選手ロスター表示用（フルスクリーン、片チームのみ） | チーム名 + プレイヤー4名分（名前・持ちブキアイコン最大3つ・X ID）+ 意気込み（メンバー一覧の下） |
+| 選手名 ×4（左右） | 黒バー 4 本（上端 680 / 752 / 824 / 896px、高さ 66px）。アルファは左揃え `left: 50px`、ブラボーは右揃え `right: 45px` | `team.rosters[eventId]`。`FitText` で幅 320px に自動縮小 |
+| チーム名（左右） | 下段の大きい黒バー（y 980〜1080）。アルファ x 75〜540、ブラボー x 1380〜1845、中央揃え | `team.viewname`（`FitText`） |
+| 勝利本数（左右） | 黄 / 青アクセント部分（中心 x 640 / 1280、y 1028）、`#333` | `winCount`（全種目共有） |
 
-- **battle**: `selection` Replicant からチーム情報を、`winCount` Replicant から勝利本数を取得。`FitText`（`src/browser/components/FitText.tsx`）でチーム名の長さに応じてフォントサイズを自動縮小。プレイヤー名は `team.players` を使用。
-- **cast / cast-replay**: `_shared/CastGraphic.tsx` をレイアウト別に薄くラップした独立ページ。`castMembers` Replicant を読み、キャストアイコンは `_shared/castIconUrl.ts` 経由で `/cast-icons/{キャスト名}`（バンドル名プレフィックス無し）から取得。アイコンが無い担当者は `onError` でアイコンを隠す。
-- **champion**: `champion` Replicant の `side` を読むだけのステートレス描画。`side` が確定したときのみ該当チームを表示する（`champion` の導出は Extension 側 `recomputeChampion()` が担う）。`side` から先に hook を呼ばないよう、確定時だけ子コンポーネント（`useTeamData`）をマウントする。
-- **team-roster-alpha/bravo**: `_shared/TeamRosterGraphic.tsx` を `side` propsで出し分けてマウントする独立ページ（1ページ2チーム表示ではない）。武器画像は `_shared/weaponImageUrl.ts` 経由で `/weapon-images/{id}.png`(バンドル名プレフィックス無し。`nodecg.mount()` は `/bundles/{bundleName}/` 配下に自動プレフィックスされないため)から取得(`player.weapons.slice(0, 3)`)。X IDは表示側で先頭`@`を正規化して付与する（データ自体は生値を保持）。意気込み（`team.comment`）はメンバー一覧の下（`.roster-comment-box`）に `FitText` で 1 行表示し、空文字なら箱ごと描画しない。旧 Replicant 永続値には `comment` が無い場合があるため `?? ''` でガードする。
-- 装飾は CSS クラスのみ付与。スタイル調整は手動で行う。
-- チームは `selection` Replicant のアルファ/ブラボー選択に応じて即時表示される（表示/非表示の切り替えやフェード制御は無い）。
+- `selection[eventId]` からチームを取得（`_shared/useTeamData.ts` の `useTeamData(eventId, side)`）。未選択の側は何も描かない。
+- フォントは「でらすこゴシック」（`font-family: 'DelaSuko Gothic One'`）。リポジトリには同梱せず、配信 PC にインストールしたものを使う。
+- 白文字はサンプルに似せた濃い縁取り（`text-shadow`）付き。座標・見た目の微調整は手動で行う。
 
 ## 実装パターン
 
-- **HTML 生成**: `{name}/index.tsx` を置くとビルド時に `graphics/{name}.html` が自動生成される。手動で HTML を書かない。
+- **HTML 生成**: `{name}/index.tsx` を置くとビルド時に `graphics/{name}.html` が自動生成される。手動で HTML を書かない。`package.json` の `nodecg.graphics` への登録は手動。
 - **`_shared/` ディレクトリ**: graphics 共通コンポーネント + CSS を配置。`index.tsx` がないためエントリ扱いされない。
