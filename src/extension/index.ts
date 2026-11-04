@@ -1,8 +1,8 @@
 import type { NodeCG } from './nodecg';
 import { loadTeamsPoolFromCsv, parseTeamsPoolFromCsvText } from './loadTeams';
 import { loadTeamsFromSheets } from './loadTeamsFromSheets';
-import { createWeaponImageMiddleware } from './serveWeaponImages';
-import type { Team } from '../schemas';
+import { applyResult, changedSides, remapSelection, selectionNames } from './matchState';
+import type { Team, TeamsPool } from '../schemas';
 
 export default (nodecg: NodeCG) => {
   const log = new nodecg.Logger('ikaterrace');
@@ -12,26 +12,31 @@ export default (nodecg: NodeCG) => {
   const selectionRep = nodecg.Replicant('selection');
   const winCountRep = nodecg.Replicant('winCount');
 
-  // チーム選択が入れ替わったら、その枠の勝利数を 0 にリセットする。
+  // チーム選択が入れ替わったら、その枠の勝利数（全種目共有）を 0 にリセットする。
   // Extension 側で一元化することで、Dashboard 経由でもプログラム経由でも確実にリセットされる。
-  selectionRep.on('change', (newVal, oldVal) => {
-    if (!newVal || !oldVal) return; // 初回購読（oldVal=undefined）はスキップ
-    const wc = winCountRep.value ?? { alpha: 0, bravo: 0 };
-    const next = { ...wc };
-    let changed = false;
-    if (newVal.alpha !== oldVal.alpha) {
-      next.alpha = 0;
-      changed = true;
-    }
-    if (newVal.bravo !== oldVal.bravo) {
-      next.bravo = 0;
-      changed = true;
-    }
-    if (changed) {
-      winCountRep.value = next;
-      log.info(`[winCount] selection 変更により勝利数をリセット: ${JSON.stringify(next)}`);
-    }
+  // 比較は ID ではなくチーム名で行う（再読込で ID だけが付け替わった場合はリセットしない）。
+  let prevNames: ReturnType<typeof selectionNames> | null = null;
+  selectionRep.on('change', (newVal) => {
+    if (!newVal) return;
+    const nextNames = selectionNames(newVal, teamsPoolRep.value ?? []);
+    const sides = prevNames ? changedSides(prevNames, nextNames) : []; // 初回購読は記録のみ
+    prevNames = nextNames;
+    if (sides.length === 0) return;
+    const next = { ...(winCountRep.value ?? { alpha: 0, bravo: 0 }) };
+    for (const side of sides) next[side] = 0;
+    winCountRep.value = next;
+    log.info(`[winCount] selection 変更により勝利数をリセット: ${JSON.stringify(next)}`);
   });
+
+  // teamsPool を丸ごと置き換え、各種目の選択をチーム名で新しい ID に付け替える。
+  // teamsPool を先に置き換えるので、selection の change ハンドラは新しいプールで名前を解決する。
+  const replaceTeamsPool = (next: TeamsPool) => {
+    const oldPool = teamsPoolRep.value ?? [];
+    teamsPoolRep.value = next;
+    if (selectionRep.value) {
+      selectionRep.value = remapSelection(selectionRep.value, oldPool, next);
+    }
+  };
 
   // 初回起動時のみ teamsPool を初期化。Googleスプレッドシートを優先し、
   // 読み込めない場合（未設定・認証失敗等）は data/teams.csv にフォールバックする。
@@ -39,11 +44,11 @@ export default (nodecg: NodeCG) => {
     void (async () => {
       const fromSheets = await loadTeamsFromSheets(log);
       if (fromSheets && fromSheets.length > 0) {
-        teamsPoolRep.value = fromSheets;
+        replaceTeamsPool(fromSheets);
         log.info(`Loaded teams from Google Sheets: ${fromSheets.length}`);
       } else {
         const loaded = loadTeamsPoolFromCsv();
-        teamsPoolRep.value = loaded;
+        replaceTeamsPool(loaded);
         log.info(`Loaded teams from CSV (fallback): ${loaded.length}`);
       }
     })();
@@ -94,7 +99,7 @@ export default (nodecg: NodeCG) => {
         return;
       }
 
-      teamsPoolRep.value = loaded;
+      replaceTeamsPool(loaded);
       log.info(`[upload-teams-csv] ${loaded.length} 件`);
       res.status(200).json({ teams: loaded.length });
     });
@@ -104,12 +109,9 @@ export default (nodecg: NodeCG) => {
     });
   });
 
-  // GET /weapon-images/{id}.png
-  nodecg.mount('/weapon-images', createWeaponImageMiddleware(log));
-
   // OBS 等の外部トリガーから勝利数（本数）を操作するエンドポイント
   // POST /result  (body: { "result": "alpha_win" | "bravo_win" | "reset" }, Content-Type: application/json)
-  //   alpha_win / bravo_win → 該当枠 +1、reset → 両枠 0
+  //   alpha_win / bravo_win → 該当枠 +1（必要勝利数 2 で頭打ち）、reset → 両枠 0
   // NodeCG がグローバルに express.json() を適用済みのため、パース済みの req.body を参照する
   // （不正な JSON はここに到達する前に 400 系で弾かれる）。
   nodecg.mount('/result', (req, res) => {
@@ -125,14 +127,7 @@ export default (nodecg: NodeCG) => {
       return;
     }
 
-    const wc = winCountRep.value ?? { alpha: 0, bravo: 0 };
-    if (result === 'reset') {
-      winCountRep.value = { alpha: 0, bravo: 0 };
-    } else if (result === 'alpha_win') {
-      winCountRep.value = { ...wc, alpha: wc.alpha + 1 };
-    } else {
-      winCountRep.value = { ...wc, bravo: wc.bravo + 1 };
-    }
+    winCountRep.value = applyResult(winCountRep.value ?? { alpha: 0, bravo: 0 }, result);
     log.info(`[result] '${result}' -> winCount=${JSON.stringify(winCountRep.value)}`);
     res.status(202).end();
   });
@@ -141,7 +136,7 @@ export default (nodecg: NodeCG) => {
 
   nodecg.listenFor('reloadTeamsCsv', (_data, ack) => {
     const loaded = loadTeamsPoolFromCsv();
-    teamsPoolRep.value = loaded;
+    replaceTeamsPool(loaded);
     log.info(`Reloaded teams from CSV: ${loaded.length}`);
     if (ack && !ack.handled) ack(null);
   });
@@ -150,7 +145,7 @@ export default (nodecg: NodeCG) => {
     void (async () => {
       const loaded = await loadTeamsFromSheets(log);
       if (loaded) {
-        teamsPoolRep.value = loaded;
+        replaceTeamsPool(loaded);
         log.info(`Reloaded teams from Google Sheets: ${loaded.length}`);
         if (ack && !ack.handled) ack(null);
       } else {
@@ -174,13 +169,13 @@ export default (nodecg: NodeCG) => {
     }
 
     const prev = pool[idx];
-    const { players: patchPlayers, ...patchRest } = patch;
-    const updated: Team = { ...prev, ...patchRest };
-    if (patchPlayers) {
-      updated.players = prev.players.map((p, i) => ({
-        ...p,
-        ...patchPlayers[i],
-      })) as Team['players'];
+    const updated: Team = { ...prev, rosters: { ...prev.rosters } };
+    if (patch.viewname !== undefined) updated.viewname = patch.viewname;
+    if (patch.player) {
+      const { eventId, index, name } = patch.player;
+      const roster = [...prev.rosters[eventId]] as Team['rosters'][typeof eventId];
+      roster[index] = name;
+      updated.rosters[eventId] = roster;
     }
 
     const newPool = [...pool];
