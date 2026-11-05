@@ -24,14 +24,14 @@
   align-items: center;
   width: 320px;
   height: 66px;
-  font-size: 48px;
+  font-size: 40px;
   line-height: 1;
 }
 
-.battle-player-1 { top: 686px; }
-.battle-player-2 { top: 758px; }
-.battle-player-3 { top: 830px; }
-.battle-player-4 { top: 902px; }
+.battle-player-1 { top: 684px; }
+.battle-player-2 { top: 756px; }
+.battle-player-3 { top: 828px; }
+.battle-player-4 { top: 900px; }
 
 .battle-alpha .battle-player {
   left: 50px;
@@ -39,7 +39,7 @@
 }
 
 .battle-bravo .battle-player {
-  right: 45px;
+  right: 50px;
   justify-content: flex-end;
 }
 
@@ -60,7 +60,7 @@
   align-items: center;
   width: 465px;
   height: 100px;
-  font-size: 52px;
+  font-size: 56px;
   line-height: 1.1;
   text-align: center;
 }
